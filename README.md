@@ -32,7 +32,6 @@ This module contains several files and directories.
 
 **prebuilt**
 * `./prebuilt/optee_os`: prebuilt image of the OP-TEE OS
-* `./prebuilt/disco/*`: prebuilt Trusted Application (TA) images and TA build environment for discovery board
 * `./prebuilt/eval/*`: prebuilt Trusted Application (TA) images and TA build environment for evaluation board
 
 **source**
