@@ -1,5 +1,5 @@
 # auto-generated TEE configuration file
-# TEE version 25209b4
+# TEE version c50f58d
 set(CFG_AES_GCM_TABLE_BASED y)
 set(CFG_ARM32_core y)
 set(CFG_ARM32_ta_arm32 y)

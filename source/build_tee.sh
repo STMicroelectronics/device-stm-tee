@@ -69,7 +69,7 @@ BOARD_FLAVOUR_LIST=( "ev1" )
 #######################################
 # Variables
 #######################################
-nb_states=1
+nb_states=0
 do_install=0
 do_onlyclean=0
 
@@ -261,23 +261,24 @@ in_list()
 init_nb_states()
 {
   if [[ ${do_all_board} == 1 ]]; then
-    if [[ ${do_onlyclean} == 1 ]]; then
-      nb_states=2
-    else
-      if [[ ${do_install} == 1 ]]; then
-        nb_states=4
+    for board_name in "${BOARD_NAME_LIST[@]}"
+    do
+      if [ ${do_onlyclean} == 1 ]; then
+        nb_states=$((nb_states+1))
       else
-        nb_states=2
+        nb_states=$((nb_states+1))
+        if [[ ${do_install} == 1 ]]; then
+          nb_states=$((nb_states+1))
+        fi
       fi
-    fi
+    done
   else
-    if [[ ${do_onlyclean} == 1 ]]; then
-      nb_states=1
+    if [ ${do_onlyclean} == 1 ]; then
+      nb_states=$((nb_states+1))
     else
+      nb_states=$((nb_states+1))
       if [[ ${do_install} == 1 ]]; then
-        nb_states=2
-      else
-        nb_states=1
+        nb_states=$((nb_states+1))
       fi
     fi
   fi
@@ -430,7 +431,6 @@ while test "$1" != ""; do
       ;;
 
     "-i"|"--install" )
-      nb_states=$((nb_states+1))
       do_install=1
       ;;
 
