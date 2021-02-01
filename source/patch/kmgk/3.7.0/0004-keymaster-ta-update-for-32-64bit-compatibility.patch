@@ -1,0 +1,309 @@
+From f5095b421bd41cba6f89e3ef483cbeea5827d95e Mon Sep 17 00:00:00 2001
+From: frq09432 <nicolas.louboutin@st.com>
+Date: Wed, 24 Jun 2020 15:03:56 +0200
+Subject: [PATCH 4/6] keymaster: ta: update for 32/64bit compatibility
+
+---
+ keymaster/ta/crypto_rsa.c            |  2 +-
+ keymaster/ta/generator.c             | 18 +++++++++++++-----
+ keymaster/ta/include/generator.h     |  2 +-
+ keymaster/ta/include/mbedtls_proxy.h |  2 +-
+ keymaster/ta/include/parameters.h    |  4 ++--
+ keymaster/ta/keystore_ta.c           |  5 +++--
+ keymaster/ta/mbedtls_proxy.c         | 11 +++++++----
+ keymaster/ta/parameters.c            |  8 +++++---
+ keymaster/ta/parsel.c                | 14 ++++++++------
+ 9 files changed, 41 insertions(+), 25 deletions(-)
+
+diff --git a/keymaster/ta/crypto_rsa.c b/keymaster/ta/crypto_rsa.c
+index e9ac281..fe66a1e 100644
+--- a/keymaster/ta/crypto_rsa.c
++++ b/keymaster/ta/crypto_rsa.c
+@@ -370,7 +370,7 @@ keymaster_error_t TA_rsa_update(keymaster_operation_t *operation,
+ 
+ 	if (input->data_length > key_bytes &&
+ 			*operation->digest_op == TEE_HANDLE_NULL) {
+-		EMSG("Input (%lu) exeeds RSA key size (%u)",
++		EMSG("Input (%" PRIdSizeT ") exeeds RSA key size (%u)",
+ 					input->data_length, key_bytes);
+ 		return KM_ERROR_INVALID_INPUT_LENGTH;
+ 	}
+diff --git a/keymaster/ta/generator.c b/keymaster/ta/generator.c
+index c738e34..a98d0c1 100644
+--- a/keymaster/ta/generator.c
++++ b/keymaster/ta/generator.c
+@@ -309,7 +309,7 @@ keymaster_error_t TA_generate_key(const keymaster_algorithm_t algorithm,
+ 					const uint32_t key_size,
+ 					uint8_t *key_material,
+ 					const keymaster_digest_t digest,
+-					const uint64_t rsa_public_exponent)
++					const unsigned long rsa_public_exponent)
+ {
+ 	TEE_ObjectHandle obj_h = TEE_HANDLE_NULL;
+ 	TEE_Result res = TEE_SUCCESS;
+@@ -323,7 +323,11 @@ keymaster_error_t TA_generate_key(const keymaster_algorithm_t algorithm,
+ 	uint32_t curve = UNDEFINED;
+ 	uint8_t buffer[KM_MAX_ATTR_SIZE] = { 0 };
+ 	uint8_t *buf_pe = NULL;
++#ifdef __ILP32__
++	uint32_t be_pe = 0;
++#else
+ 	uint64_t be_pe = 0;
++#endif
+ 	TEE_Attribute *attrs_in = NULL;
+ 	uint32_t attrs_in_count = 0;
+ 
+@@ -378,7 +382,12 @@ keymaster_error_t TA_generate_key(const keymaster_algorithm_t algorithm,
+ 			res = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+ 			goto gk_out;
+ 		}
++
++#ifdef __ILP32__
++		be_pe = TEE_U32_TO_BIG_ENDIAN(rsa_public_exponent);
++#else
+ 		be_pe = TEE_U64_TO_BIG_ENDIAN(rsa_public_exponent);
++#endif
+ 		TEE_MemMove(buf_pe, &be_pe, sizeof(rsa_public_exponent));
+ 		TEE_InitRefAttribute(attrs_in,
+ 					TEE_ATTR_RSA_PUBLIC_EXPONENT,
+@@ -782,15 +791,14 @@ keymaster_error_t TA_restore_key(uint8_t *key_material,
+ 	//TODO: Why UNKNOWN origin is here?
+ 	TA_add_origin(params_t, KM_ORIGIN_UNKNOWN, false);
+ out_rk:
+-	if (res != KM_ERROR_OK)
++	if (res != KM_ERROR_OK) {
++		EMSG("populate attrs is finished with err %d", res);
+ 		TEE_FreeTransientObject(*obj_h);
+-	else {
++	} else {
+ 		*type = attrs.type;
+ 		*key_size = attrs.size;
+ 	}
+ 
+-
+-	EMSG("populate attrs is finished with err %d", res);
+ 	free_attrs(attrs.attrs, attrs.attrs_count);
+ 
+ 	return res;
+diff --git a/keymaster/ta/include/generator.h b/keymaster/ta/include/generator.h
+index f14ed6d..89f4092 100644
+--- a/keymaster/ta/include/generator.h
++++ b/keymaster/ta/include/generator.h
+@@ -69,7 +69,7 @@ keymaster_error_t TA_generate_key(const keymaster_algorithm_t algorithm,
+ 				const uint32_t key_size,
+ 				uint8_t *key_material,
+ 				const keymaster_digest_t digest,
+-				const uint64_t rsa_public_exponent);
++				const unsigned long rsa_public_exponent);
+ 
+ keymaster_error_t TA_restore_key(uint8_t *key_material,
+ 				const keymaster_key_blob_t *key_blob,
+diff --git a/keymaster/ta/include/mbedtls_proxy.h b/keymaster/ta/include/mbedtls_proxy.h
+index b2553f5..7373b2f 100644
+--- a/keymaster/ta/include/mbedtls_proxy.h
++++ b/keymaster/ta/include/mbedtls_proxy.h
+@@ -41,7 +41,7 @@ keymaster_error_t mbedTLS_decode_pkcs8(keymaster_blob_t key_data,
+ 				       uint32_t *attrs_count,
+ 				       const keymaster_algorithm_t algorithm,
+ 				       uint32_t *key_size,
+-				       uint64_t *rsa_public_exponent);
++				       unsigned long *rsa_public_exponent);
+ 
+ keymaster_error_t mbedTLS_encode_key(keymaster_blob_t *export_data,
+                                      const uint32_t type,
+diff --git a/keymaster/ta/include/parameters.h b/keymaster/ta/include/parameters.h
+index 54571ab..aecc29c 100644
+--- a/keymaster/ta/include/parameters.h
++++ b/keymaster/ta/include/parameters.h
+@@ -67,7 +67,7 @@ void TA_push_param(keymaster_key_param_set_t *params,
+ keymaster_error_t TA_parse_params(const keymaster_key_param_set_t params_t,
+ 				keymaster_algorithm_t *key_algorithm,
+ 				uint32_t *key_size,
+-				uint64_t *key_rsa_public_exponent,
++				unsigned long *key_rsa_public_exponent,
+ 				keymaster_digest_t *key_digest,
+ 				const bool import);
+ 
+@@ -105,7 +105,7 @@ bool is_origination_purpose(const keymaster_purpose_t purpose);
+ 
+ void TA_add_to_params(keymaster_key_param_set_t *params,
+ 				const uint32_t key_size,
+-				const uint64_t rsa_public_exponent);
++				const unsigned long rsa_public_exponent);
+ 
+ void TA_free_params(keymaster_key_param_set_t *params);
+ 
+diff --git a/keymaster/ta/keystore_ta.c b/keymaster/ta/keystore_ta.c
+index aea8791..4666a0b 100644
+--- a/keymaster/ta/keystore_ta.c
++++ b/keymaster/ta/keystore_ta.c
+@@ -256,7 +256,8 @@ static keymaster_error_t TA_generateKey(TEE_Param params[TEE_NUM_PARAMS])
+ 	uint32_t key_buffer_size = 0; //For serialization of generated key
+ 	uint32_t characts_size = 0;
+ 	uint32_t key_size = UNDEFINED;
+-	uint64_t key_rsa_public_exponent = UNDEFINED;
++	unsigned long key_rsa_public_exponent = UNDEFINED;
++
+ 	uint32_t os_version = 0xFFFFFFFF;
+ 	uint32_t os_patchlevel = 0xFFFFFFFF;
+ 
+@@ -460,7 +461,7 @@ static keymaster_error_t TA_importKey(TEE_Param params[TEE_NUM_PARAMS])
+ 	uint32_t characts_size = 0;
+ 	uint32_t key_size = UNDEFINED;
+ 	uint32_t attrs_in_count = 0;
+-	uint64_t key_rsa_public_exponent = UNDEFINED;
++	unsigned long key_rsa_public_exponent = UNDEFINED;
+ 
+ 	DMSG("%s %d", __func__, __LINE__);
+ 	in = (uint8_t *) params[0].memref.buffer;
+diff --git a/keymaster/ta/mbedtls_proxy.c b/keymaster/ta/mbedtls_proxy.c
+index d340596..b551770 100644
+--- a/keymaster/ta/mbedtls_proxy.c
++++ b/keymaster/ta/mbedtls_proxy.c
+@@ -269,12 +269,12 @@ keymaster_error_t mbedTLS_decode_pkcs8(keymaster_blob_t key_data,
+ 				       uint32_t *attrs_count,
+ 				       const keymaster_algorithm_t algorithm,
+ 				       uint32_t *key_size,
+-				       uint64_t *rsa_public_exponent)
++				       unsigned long *rsa_public_exponent)
+ {
+ 	mbedtls_pk_context pk;
+ 	keymaster_error_t ret = KM_ERROR_UNKNOWN_ERROR;
+ 	mbedtls_pk_type_t pk_type;
+-	uint64_t rsa_exp = 0;
++	unsigned long rsa_exp = 0;
+ 
+ 	keymaster_error_t (*pfn_export_ctx)(TEE_Attribute **, uint32_t *,
+ 					    uint32_t *, mbedtls_pk_context *);
+@@ -309,8 +309,11 @@ keymaster_error_t mbedTLS_decode_pkcs8(keymaster_blob_t key_data,
+ 		mbedtls_mpi_write_binary(&ctx->E,
+ 					 (unsigned char*)&rsa_exp,
+ 					 sizeof(rsa_exp));
+-
++#ifdef __ILP32__
++		*rsa_public_exponent = TEE_U32_FROM_BIG_ENDIAN(rsa_exp);
++#else
+ 		*rsa_public_exponent = TEE_U64_FROM_BIG_ENDIAN(rsa_exp);
++#endif
+ 	}
+ 
+ 	pfn_export_ctx = algorithm == KM_ALGORITHM_RSA ? mbedtls_export_rsa :
+@@ -1879,7 +1882,7 @@ static int write_authorization_lists(keymaster_key_characteristics_t *chr,
+ 		uint64_t long_par;
+ 		uint32_t rep_par[REP_TAG_MAX_VALUES];
+ 		keymaster_blob_t blob_par = EMPTY_BLOB;
+-		void *par_ptr;
++		void *par_ptr = NULL;
+ 
+ 		size_t par_count = 0;
+ 
+diff --git a/keymaster/ta/parameters.c b/keymaster/ta/parameters.c
+index 80a4e51..2c5aebe 100644
+--- a/keymaster/ta/parameters.c
++++ b/keymaster/ta/parameters.c
+@@ -15,6 +15,8 @@
+  * limitations under the License.
+  */
+ 
++#include <inttypes.h>
++
+ #include "parameters.h"
+ #include "generator.h"
+ const size_t kMinGcmTagLength = 12 * 8;
+@@ -51,7 +53,7 @@ void TA_free_cert_chain(keymaster_cert_chain_t *cert_chain)
+ 
+ void TA_add_to_params(keymaster_key_param_set_t *params,
+ 		      const uint32_t key_size,
+-		      const uint64_t rsa_public_exponent)
++		      const unsigned long rsa_public_exponent)
+ {
+ 	bool was_added = false;
+ 	uint32_t curve = TA_get_curve_nist(key_size);
+@@ -146,7 +148,7 @@ void TA_push_param(keymaster_key_param_set_t *enforced,
+ keymaster_error_t TA_parse_params(const keymaster_key_param_set_t params_t,
+ 				keymaster_algorithm_t *key_algorithm,
+ 				uint32_t *key_size,
+-				uint64_t *key_rsa_public_exponent,
++				unsigned long *key_rsa_public_exponent,
+ 				keymaster_digest_t *key_digest,
+ 				const bool import)
+ {
+@@ -1014,7 +1016,7 @@ keymaster_error_t TA_check_params(const keymaster_key_param_set_t *key_params,
+ 			}
+ 			if (nonce->data_length > 0 && nonce->data_length != 12 &&
+ 					nonce->data_length != 16) {
+-				EMSG("Wrong nonce length is prohibited %ld", nonce->data_length);
++				EMSG("Wrong nonce length is prohibited %" PRIdSizeT, nonce->data_length);
+ 				res = KM_ERROR_INVALID_NONCE;
+ 				goto out_cp;
+ 			}
+diff --git a/keymaster/ta/parsel.c b/keymaster/ta/parsel.c
+index d80d51d..3e5df31 100644
+--- a/keymaster/ta/parsel.c
++++ b/keymaster/ta/parsel.c
+@@ -15,6 +15,8 @@
+  * limitations under the License.
+  */
+ 
++#include <inttypes.h>
++
+ #include "parsel.h"
+ #include "attestation.h"
+ #include "generator.h"
+@@ -51,7 +53,7 @@ int TA_deserialize_blob_akms(uint8_t *in, const uint8_t *end,
+ 	TEE_MemMove(&blob->data_length, in, SIZE_LENGTH_AKMS);
+ 	in += SIZE_LENGTH_AKMS;
+ 	if (IS_OUT_OF_BOUNDS(in, end, blob->data_length)) {
+-		EMSG("Out of input array bounds on deserialization %lu", blob->data_length);
++		EMSG("Out of input array bounds on deserialization %" PRIdSizeT, blob->data_length);
+ 		*res = KM_ERROR_INSUFFICIENT_BUFFER_SPACE;
+ 		return in - start;
+ 	}
+@@ -124,7 +126,7 @@ static bool param_deserialize(keymaster_key_param_t* param, uint8_t** buf_ptr, c
+         TEE_MemMove(&offset, *buf_ptr, sizeof(offset));
+ 		*buf_ptr += sizeof(uint32_t);
+         if (((param->key_param.blob.data_length + offset) < param->key_param.blob.data_length) ||  // Overflow check
+-            (offset > (indirect_end - indirect_base)) ||
++            (offset > (unsigned)(indirect_end - indirect_base)) ||
+             ((offset + param->key_param.blob.data_length) > (unsigned long)(indirect_end - indirect_base))) {
+             DMSG("blob params deserialize err");
+             return false;
+@@ -139,7 +141,7 @@ static bool param_deserialize(keymaster_key_param_t* param, uint8_t** buf_ptr, c
+             }
+             TEE_MemMove(data, indirect_base + offset, param->key_param.blob.data_length);
+             param->key_param.blob.data = data;
+-            DMSG("type blob, blob_data:%p, blob len:%ld", param->key_param.blob.data, param->key_param.blob.data_length);
++            DMSG("type blob, blob_data:%p, blob len:%" PRIdSizeT, param->key_param.blob.data, param->key_param.blob.data_length);
+         }
+ 		//data_length(uint32_t) and offset(uint32_t)
+         return true;
+@@ -208,7 +210,7 @@ int TA_deserialize_auth_set(uint8_t *in, const uint8_t *end,
+ 	}
+ 	TEE_MemMove(&param_set->length, in, SIZE_LENGTH_AKMS);
+ 	in += SIZE_LENGTH_AKMS;
+-	DMSG("elem cnt:%ld", param_set->length);
++	DMSG("elem cnt:%" PRIdSizeT, param_set->length);
+ 
+ 	//Size of elems_(uint32_t)
+ 	if (IS_OUT_OF_BOUNDS(in, end, SIZE_LENGTH_AKMS)) {
+@@ -438,7 +440,7 @@ static uint8_t* param_serialize(const keymaster_key_param_t *param, uint8_t* buf
+     case KM_BYTES:
+ 		TEE_MemMove(buf, &param->key_param.blob.data_length, SIZE_LENGTH_AKMS);
+         buf += SIZE_LENGTH_AKMS;
+-		DMSG("blob len: %ld", param->key_param.blob.data_length);
++		DMSG("blob len: %" PRIdSizeT, param->key_param.blob.data_length);
+ 		offset = addr_indirect_data - indirect_base;
+ 		TEE_MemMove(buf, &offset, SIZE_LENGTH_AKMS);
+ 		DMSG("blob offset: %d", offset);
+@@ -496,7 +498,7 @@ int TA_serialize_auth_set(uint8_t *out,
+ 	//elems count
+ 	TEE_MemMove(out, &param_set->length, SIZE_LENGTH_AKMS);
+ 	out += SIZE_LENGTH_AKMS;
+-	DMSG("elems cnt: %ld", param_set->length);
++	DMSG("elems cnt: %" PRIdSizeT, param_set->length);
+ 
+ 	//elems size
+ 	p_elems_size = out;
+-- 
+2.17.1
+

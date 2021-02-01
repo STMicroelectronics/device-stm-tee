@@ -1,0 +1,31 @@
+From 2eb484bc1c536ea571c164f6b854e9006bf58901 Mon Sep 17 00:00:00 2001
+From: Jerome Forissier <jerome@forissier.org>
+Date: Mon, 12 Oct 2020 13:44:10 +0200
+Subject: [PATCH 06/10] core: rpmb: fix off-by-one in block index check
+
+The max block index check in tee_rpmb_req_pack() is incorrect and would
+fail when trying to access the last block of the partition.
+
+Signed-off-by: Jerome Forissier <jerome@forissier.org>
+Acked-by: Jens Wiklander <jens.wiklander@linaro.org>
+Reviewed-by: Etienne Carriere <etienne.carriere@linaro.org>
+---
+ core/tee/tee_rpmb_fs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/tee/tee_rpmb_fs.c b/core/tee/tee_rpmb_fs.c
+index bea18f4..ddf22a6 100644
+--- a/core/tee/tee_rpmb_fs.c
++++ b/core/tee/tee_rpmb_fs.c
+@@ -571,7 +571,7 @@ static TEE_Result tee_rpmb_req_pack(struct rpmb_req *req,
+ 
+ 		if (rawdata->blk_idx) {
+ 			/* Check the block index is within range. */
+-			if ((*rawdata->blk_idx + nbr_frms) >
++			if ((*rawdata->blk_idx + nbr_frms - 1) >
+ 			    rpmb_ctx->max_blk_idx) {
+ 				res = TEE_ERROR_GENERIC;
+ 				goto func_exit;
+-- 
+2.17.1
+

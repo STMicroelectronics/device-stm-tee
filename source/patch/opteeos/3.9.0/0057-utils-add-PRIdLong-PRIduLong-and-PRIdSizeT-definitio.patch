@@ -1,0 +1,53 @@
+From 00a80b195cd66fcda356bc441e165950729589fc Mon Sep 17 00:00:00 2001
+From: frq09432 <nicolas.louboutin@st.com>
+Date: Tue, 23 Jun 2020 17:25:38 +0200
+Subject: [PATCH 16/17] utils: add PRIdLong, PRIduLong and PRIdSizeT definition
+ for 32/64bit compatibility
+
+Replace (type long): ("%ld", longvalue) or ("%lld", longvalue) by ("%" PRIdLong, longvalue)
+Replace (type unsigned long): ("%lu", ulongvalue) or ("%llu", ulongvalue) by ("%" PRIduLong, longvalue)
+Replace (type size_t): ("%u", sizetvalue) or ("%lu", sizetvalue) by ("%" PRIdSizeT, longvalue)
+
+Signed-off-by: Nicolas Louboutin <nicolas.louboutin@st.com>
+---
+ lib/libutils/isoc/include/inttypes.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/lib/libutils/isoc/include/inttypes.h b/lib/libutils/isoc/include/inttypes.h
+index 3563870..3c0a30e 100644
+--- a/lib/libutils/isoc/include/inttypes.h
++++ b/lib/libutils/isoc/include/inttypes.h
+@@ -9,9 +9,13 @@
+ 
+ #ifdef __ILP32__
+ #define __PRI64_PREFIX	"ll"
++#define __PRISIZE_PREFIX	""
++#define __PRILONG_PREFIX	"l"
+ #endif
+ #ifdef __LP64__
+ #define __PRI64_PREFIX	"l"
++#define __PRISIZE_PREFIX	"l"
++#define __PRILONG_PREFIX	"ll"
+ #endif
+ #define __PRIPTR_PREFIX "l"
+ 
+@@ -20,6 +24,7 @@
+ #define PRId32		"d"
+ #define PRId64		__PRI64_PREFIX "d"
+ #define PRIdPTR		__PRIPTR_PREFIX "d"
++#define PRIdLong	__PRILONG_PREFIX "d"
+ 
+ #define PRIi8		"i"
+ #define PRIi16		"i"
+@@ -38,6 +43,8 @@
+ #define PRIu32		"u"
+ #define PRIu64		__PRI64_PREFIX "u"
+ #define PRIuPTR		__PRIPTR_PREFIX "u"
++#define PRIdSizeT	__PRISIZE_PREFIX "u"
++#define PRIduLong	__PRILONG_PREFIX "u"
+ 
+ #define PRIx8		"x"
+ #define PRIx16		"x"
+-- 
+2.17.1
+

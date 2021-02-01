@@ -1,0 +1,157 @@
+From 075b365736552bac851acba968efd6deb4ef475a Mon Sep 17 00:00:00 2001
+From: frq09432 <nicolas.louboutin@st.com>
+Date: Wed, 24 Jun 2020 15:00:54 +0200
+Subject: [PATCH 2/6] keymaster: clean (replace tab by space for indentation)
+
+---
+ keymaster/3.0/optee_keymaster3_device.cpp | 94 +++++++++++------------
+ keymaster/ipc/optee_keymaster_ipc.cpp     |  8 +-
+ 2 files changed, 51 insertions(+), 51 deletions(-)
+
+diff --git a/keymaster/3.0/optee_keymaster3_device.cpp b/keymaster/3.0/optee_keymaster3_device.cpp
+index e01e80d..1811d1e 100644
+--- a/keymaster/3.0/optee_keymaster3_device.cpp
++++ b/keymaster/3.0/optee_keymaster3_device.cpp
+@@ -94,56 +94,56 @@ inline static ErrorCode legacy_enum_conversion(const keymaster_error_t value) {
+  */
+ class KmParamSet : public keymaster_key_param_set_t {
+   public:
+-	KmParamSet(const hidl_vec<KeyParameter> &keyParams) {
+-	    ALOGD("%s %d", __func__, __LINE__);
+-	    params = new keymaster_key_param_t[keyParams.size()];
+-	    length = keyParams.size();
+-	    for (size_t i = 0; i < keyParams.size(); ++i) {
+-	        auto tag = legacy_enum_conversion(keyParams[i].tag);
+-	        switch (typeFromTag(tag)) {
+-	        case KM_ENUM:
+-	        case KM_ENUM_REP:
+-	            params[i] = keymaster_param_enum(tag, keyParams[i].f.integer);
+-	            break;
+-	        case KM_UINT:
+-	        case KM_UINT_REP:
+-	            params[i] = keymaster_param_int(tag, keyParams[i].f.integer);
+-	            break;
+-	        case KM_ULONG:
+-	        case KM_ULONG_REP:
+-	            params[i] = keymaster_param_long(tag, keyParams[i].f.longInteger);
+-	            break;
+-	        case KM_DATE:
+-	            params[i] = keymaster_param_date(tag, keyParams[i].f.dateTime);
+-	            break;
+-	        case KM_BOOL:
+-	            if (keyParams[i].f.boolValue)
+-	                params[i] = keymaster_param_bool(tag);
+-	            else
+-	                params[i].tag = KM_TAG_INVALID;
+-	            break;
+-	        case KM_BIGNUM:
+-	        case KM_BYTES:
+-	            params[i] =
+-	                keymaster_param_blob(tag, &keyParams[i].blob[0], keyParams[i].blob.size());
+-	            break;
+-	        case KM_INVALID:
+-	        default:
+-	            params[i].tag = KM_TAG_INVALID;
+-	            /* just skip */
+-	            break;
+-	        }
+-	    }
+-	}
++    KmParamSet(const hidl_vec<KeyParameter> &keyParams) {
++        ALOGD("%s %d", __func__, __LINE__);
++        params = new keymaster_key_param_t[keyParams.size()];
++        length = keyParams.size();
++        for (size_t i = 0; i < keyParams.size(); ++i) {
++            auto tag = legacy_enum_conversion(keyParams[i].tag);
++            switch (typeFromTag(tag)) {
++            case KM_ENUM:
++            case KM_ENUM_REP:
++                params[i] = keymaster_param_enum(tag, keyParams[i].f.integer);
++                break;
++            case KM_UINT:
++            case KM_UINT_REP:
++                params[i] = keymaster_param_int(tag, keyParams[i].f.integer);
++                break;
++            case KM_ULONG:
++            case KM_ULONG_REP:
++                params[i] = keymaster_param_long(tag, keyParams[i].f.longInteger);
++                break;
++            case KM_DATE:
++                params[i] = keymaster_param_date(tag, keyParams[i].f.dateTime);
++                break;
++            case KM_BOOL:
++                if (keyParams[i].f.boolValue)
++                    params[i] = keymaster_param_bool(tag);
++                else
++                    params[i].tag = KM_TAG_INVALID;
++                break;
++            case KM_BIGNUM:
++            case KM_BYTES:
++                params[i] =
++                    keymaster_param_blob(tag, &keyParams[i].blob[0], keyParams[i].blob.size());
++                break;
++            case KM_INVALID:
++            default:
++                params[i].tag = KM_TAG_INVALID;
++                /* just skip */
++                break;
++            }
++        }
++    }
+ 
+     KmParamSet(KmParamSet&& other) noexcept
+         : keymaster_key_param_set_t{other.params, other.length} {
+-	    ALOGD("%s %d", __func__, __LINE__);
+-	    other.length = 0;
+-	    other.params = nullptr;
+-	}
++        ALOGD("%s %d", __func__, __LINE__);
++        other.length = 0;
++        other.params = nullptr;
++    }
+     KmParamSet(const KmParamSet&) = delete;
+-	~KmParamSet() { delete[] params; }
++    ~KmParamSet() { delete[] params; }
+ };
+ 
+ 
+@@ -257,7 +257,7 @@ Return<void>  OpteeKeymaster3Device::getHardwareFeatures(getHardwareFeatures_cb
+ Return<ErrorCode> OpteeKeymaster3Device::addRngEntropy(const hidl_vec<uint8_t> &data) {
+     ErrorCode rc = ErrorCode::OK;
+ 
+-	if (data.size() == 0) return ErrorCode::OK;
++    if (data.size() == 0) return ErrorCode::OK;
+ 
+     AddEntropyRequest request;
+     request.random_data.Reinitialize(data.data(), data.size());
+diff --git a/keymaster/ipc/optee_keymaster_ipc.cpp b/keymaster/ipc/optee_keymaster_ipc.cpp
+index 959f163..d2b8648 100644
+--- a/keymaster/ipc/optee_keymaster_ipc.cpp
++++ b/keymaster/ipc/optee_keymaster_ipc.cpp
+@@ -209,7 +209,7 @@ keymaster_error_t optee_keymaster_call(uint32_t cmd, const keymaster::Serializab
+ 
+     (void)memset(&op, 0, sizeof(op));
+ 
+-	uint32_t req_size = req.SerializedSize();
++    uint32_t req_size = req.SerializedSize();
+     if (req_size > OPTEE_KEYMASTER_SEND_BUF_SIZE) {
+         ALOGE("Request too big: %u Max size: %u", req_size, OPTEE_KEYMASTER_SEND_BUF_SIZE);
+         return KM_ERROR_INVALID_INPUT_LENGTH;
+@@ -236,11 +236,11 @@ keymaster_error_t optee_keymaster_call(uint32_t cmd, const keymaster::Serializab
+     if (res != TEEC_SUCCESS) {
+         ALOGI("TEEC_InvokeCommand cmd %d failed with code 0x%08x (%s) origin 0x%08x",
+               cmd, res, keymaster_error_message(res), err_origin);
+-	    if (res == TEEC_ERROR_TARGET_DEAD) {
++        if (res == TEEC_ERROR_TARGET_DEAD) {
+                 optee_keymaster_disconnect();
+                 optee_keymaster_connect();
+-	    }
+-	}
++        }
++    }
+ 
+     const uint8_t* p = recv_buf;
+     if (!rsp->Deserialize(&p, p + rsp_size)) {
+-- 
+2.17.1
+

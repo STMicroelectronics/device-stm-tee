@@ -1,0 +1,47 @@
+From cc9262de159cac4192d132dba188ada752160b69 Mon Sep 17 00:00:00 2001
+From: Jens Wiklander <jens.wiklander@linaro.org>
+Date: Thu, 14 Jan 2021 14:54:24 +0100
+Subject: [PATCH 10/10] core: fix bad memset() in update_write_helper()
+
+update_write_helper() is clearing uninitialized parts of blk_buf.
+There's an error in the logic calculating how much should be cleared
+resulting in a negative size being supplied to memset(). Fix this by
+always clearing blk_buf before usage.
+
+Fixes: cd799689cd3d ("core: rpmb: fix initialization of new rpmb data")
+Acked-by: Rouven Czerwinski <r.czerwinski@pengutronix.de>
+Tested-by: Jerome Forissier <jerome@forissier.org> (HiKey)
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ core/tee/tee_rpmb_fs.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
+
+diff --git a/core/tee/tee_rpmb_fs.c b/core/tee/tee_rpmb_fs.c
+index a8dfa2c..591e083 100644
+--- a/core/tee/tee_rpmb_fs.c
++++ b/core/tee/tee_rpmb_fs.c
+@@ -2299,6 +2299,7 @@ static TEE_Result update_write_helper(struct rpmb_file_handle *fh,
+ 		size_t rd_size = 0;
+ 
+ 		blk_size = MIN(TMP_BLOCK_SIZE, new_size - blk_offset);
++		memset(blk_buf, 0, blk_size);
+ 
+ 		/* Possibly read old RPMB data in temporary buffer */
+ 		if (blk_offset < pos && blk_offset < old_size) {
+@@ -2331,12 +2332,6 @@ static TEE_Result update_write_helper(struct rpmb_file_handle *fh,
+ 			memcpy(copy_dst, rem_buf, copy_size);
+ 			rem_buf += copy_size;
+ 			rem_size -= copy_size;
+-
+-			/* Extend from read data to copied data with zeros */
+-			memset(blk_buf + rd_size, 0, offset - rd_size);
+-		} else {
+-			/* Extend from read data to block end with zeros */
+-			memset(blk_buf + rd_size, 0, blk_size - rd_size);
+ 		}
+ 
+ 		/* Write temporary buffer to new RPMB destination */
+-- 
+2.17.1
+

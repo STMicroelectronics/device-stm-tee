@@ -1,0 +1,28 @@
+From 28adacb9150fa54f86657a08fca239bf869255bb Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Thu, 28 Jan 2021 13:54:51 +0100
+Subject: [PATCH] tee-supplicant: disable RPMB emulator
+
+Disable emulator to use the available RPMB (eMMC) instead.
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ tee-supplicant/tee_supplicant_android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tee-supplicant/tee_supplicant_android.mk b/tee-supplicant/tee_supplicant_android.mk
+index 182f6ea..414e959 100644
+--- a/tee-supplicant/tee_supplicant_android.mk
++++ b/tee-supplicant/tee_supplicant_android.mk
+@@ -30,7 +30,7 @@ LOCAL_SRC_FILES += src/tee_socket.c
+ LOCAL_CFLAGS += -DCFG_GP_SOCKETS=1
+ endif
+ 
+-RPMB_EMU        := 1
++RPMB_EMU        := 0
+ ifeq ($(RPMB_EMU),1)
+ LOCAL_SRC_FILES += src/sha2.c src/hmac_sha2.c
+ LOCAL_CFLAGS += -DRPMB_EMU=1
+-- 
+2.17.1
+

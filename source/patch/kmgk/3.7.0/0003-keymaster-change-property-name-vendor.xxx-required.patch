@@ -1,0 +1,25 @@
+From 7d2730e24f7d6721a191f40e3f098401c9d98b5a Mon Sep 17 00:00:00 2001
+From: frq09432 <nicolas.louboutin@st.com>
+Date: Wed, 24 Jun 2020 15:01:16 +0200
+Subject: [PATCH 3/6] keymaster: change property name (vendor.xxx required)
+
+---
+ keymaster/3.0/service.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/keymaster/3.0/service.cpp b/keymaster/3.0/service.cpp
+index d2b2175..99ec03f 100644
+--- a/keymaster/3.0/service.cpp
++++ b/keymaster/3.0/service.cpp
+@@ -43,7 +43,7 @@ int main() {
+         ALOGE("Could not register service for Keymaster 3.0 ");
+         return 1;
+     }
+-    property_set("keymaster.optee.status", "ready");
++    property_set("vendor.keymaster.optee.status", "ready");
+     android::hardware::joinRpcThreadpool();
+     return -1;  // Should never get here.
+ }
+-- 
+2.17.1
+

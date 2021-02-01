@@ -1,0 +1,28 @@
+From 70ab1362505e5f3ab1696146b02ccc3e5e2b2688 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Mon, 1 Feb 2021 09:18:14 +0100
+Subject: [PATCH 01/10] arm: plat-stm32mp1: increase HEAP size
+
+Increase heap size to insure xtest execution
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ core/arch/arm/plat-stm32mp1/conf.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/arch/arm/plat-stm32mp1/conf.mk b/core/arch/arm/plat-stm32mp1/conf.mk
+index 4b0aff8..ac3cc48 100644
+--- a/core/arch/arm/plat-stm32mp1/conf.mk
++++ b/core/arch/arm/plat-stm32mp1/conf.mk
+@@ -90,7 +90,7 @@ CFG_WITH_PAGER ?= y
+ CFG_WITH_LPAE ?= y
+ CFG_WITH_STACK_CANARIES ?= y
+ CFG_MMAP_REGIONS ?= 30
+-CFG_CORE_HEAP_SIZE ?= 49152
++CFG_CORE_HEAP_SIZE ?= 57344
+ 
+ # Disable early TA compression to limit HEAP size
+ CFG_EARLY_TA_COMPRESS ?= n
+-- 
+2.17.1
+

@@ -1,0 +1,32 @@
+From 0b84d55848e5f9297d13c045509867807ec13581 Mon Sep 17 00:00:00 2001
+From: Neil Shipp <neilsh@microsoft.com>
+Date: Thu, 1 Oct 2020 17:02:36 -0700
+Subject: [PATCH 05/10] core: Fix RPMB fat entry cache buffer overflow
+
+Ensure that fat_entry_dir_update can only update entries less than
+the current cache size and not just the maximum size limit of the cache.
+
+Signed-off-by: Neil Shipp <neilsh@microsoft.com>
+Reviewed-by: Joakim Bech <joakim.bech@linaro.org>
+Reviewed-by: Etienne Carriere <etienne.carriere@linaro.org>
+---
+ core/tee/tee_rpmb_fs.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/core/tee/tee_rpmb_fs.c b/core/tee/tee_rpmb_fs.c
+index cbf3f3c..bea18f4 100644
+--- a/core/tee/tee_rpmb_fs.c
++++ b/core/tee/tee_rpmb_fs.c
+@@ -1650,7 +1650,8 @@ static TEE_Result __maybe_unused fat_entry_dir_update
+ 			     sizeof(struct rpmb_fat_entry);
+ 
+ 	/* Only need to write if index points to an entry in cache. */
+-	if (fat_entry_buf_idx < max_cache_entries) {
++	if (fat_entry_buf_idx < fat_entry_dir->num_buffered &&
++	    fat_entry_buf_idx < max_cache_entries) {
+ 		memcpy(fat_entry_dir->rpmb_fat_entry_buf + fat_entry_buf_idx,
+ 		       fat_entry, sizeof(struct rpmb_fat_entry));
+ 	}
+-- 
+2.17.1
+

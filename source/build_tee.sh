@@ -19,17 +19,15 @@
 #######################################
 # Constants
 #######################################
-SCRIPT_VERSION="1.0"
+SCRIPT_VERSION="1.3"
 
 SOC_FAMILY="stm32mp1"
 SOC_NAME="stm32mp15"
-SOC_VERSION="stm32mp157c"
+SOC_VERSIONS=( "stm32mp157c" "stm32mp157f" )
 
 # OP-TEE
-TEE_VERSION=3.3.0
 TEE_ARCH=arm
-
-TEE_TOOLCHAIN=gcc-arm-8.2-2019.01-x86_64-arm-eabi
+TEE_TOOLCHAIN=gcc-arm-9.2-2019.12-x86_64-arm-none-eabi
 
 # OP-TEE is speparated in three parts:
 # header giving information on both pager and pageable parts
@@ -58,13 +56,36 @@ TEE_SOURCE_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/source
 TEE_PREBUILT_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/prebuilt
 
 TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/gcc/linux-x86/arm/${TEE_TOOLCHAIN}/bin
-TEE_CROSS_COMPILE=arm-eabi-
+TEE_CROSS_COMPILE=arm-none-eabi-
 
 TEE_OUT=${TOP_PATH}/out-bsp/${SOC_FAMILY}/TEE_OBJ
 
-# Board name and flavour shall be listed in associated order
-BOARD_NAME_LIST=( "eval" )
-BOARD_FLAVOUR_LIST=( "ev1" )
+# Board name and flavour shall be listed in associated order (max : two boards)
+DEFAULT_BOARD_NAME_LIST=( "eval" )
+DEFAULT_BOARD_FLAVOUR_LIST=( "ev1" )
+
+# Debug available levels
+TEE_DEBUG_0="CFG_TEE_CORE_DEBUG=n"
+TEE_DEBUG_2="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=2 CFG_TEE_TA_LOG_LEVEL=2"
+TEE_DEBUG_3="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=3 CFG_TEE_TA_LOG_LEVEL=3"
+
+# RPMB base configuration
+TEE_RPMB_CONFIG="CFG_RPMB_FS=y CFG_RPMB_FS_DEV_ID=1 CFG_RPMB_TESTKEY=y "
+# TAKE CARE: write key used to provision RPMB key (fuse), no possibility to come back.
+TEE_RPMB_CONFIG+="CFG_RPMB_WRITE_KEY=y "
+
+# Used to reset RPMB (must be performed only once, reboot is not possible with this configuration)
+# TEE_RPMB_CONFIG+="CFG_RPMB_RESET_FAT=y "
+
+# Used to trace callstack in case of TA/TEE panic error
+# Use device/stm/${SOC_FAMILY}-tee/opteeos-${SOC_FAMILY}/scripts/symbolize.py script to help understanding callstack
+# Before update the script: replace arm-linux-gnueabihf- by arm-linux-gnueabihf-
+# TEE_RPMB_CONFIG+="CFG_UNWIND=y "
+
+# case 1:  REE FS used for secure storage, RPMB used only to store anti-rollback hash of the REE FS
+TEE_RPMB_CONFIG_1="$TEE_RPMB_CONFIG CFG_REE_FS=y"
+# case 2:  RPMB used for secure storage including the anti-rollback hash
+TEE_RPMB_CONFIG_2="$TEE_RPMB_CONFIG CFG_REE_FS=n"
 
 #######################################
 # Variables
@@ -73,16 +94,18 @@ nb_states=0
 do_install=0
 do_onlyclean=0
 
-do_all_board=1
-board_name=
-
-tee_src=
-
 verbose="--quiet"
 verbose_level=0
 
+tee_debug=${TEE_DEBUG_0}
+tee_config=""
+enable_rpmb=0
+rpmb_level=0
+
 # By default redirect stdout and stderr to /dev/null
 redirect_out="/dev/null"
+
+board_name_list=("${DEFAULT_BOARD_NAME_LIST[@]}")
 
 #######################################
 # Functions
@@ -113,20 +136,27 @@ empty_line()
 #######################################
 usage()
 {
-  echo "Usage: `basename $0` [Options] [Board] [Command]"
+  echo "Usage: `basename $0` [Options] [Command]"
   empty_line
   echo "  This script allows building the OP-TEE OS source"
   empty_line
   echo "Options:"
-  echo "  -h/--help: print this message"
-  echo "  -i/--install: update prebuilt images"
-  echo "  -v/--version: get script version"
-  echo "  --verbose <level>: enable verbosity (1 or 2 depending on level of verbosity required)"
-  empty_line
-  echo "Board: Optional (default = all)"
-  echo "  -c/--current: build only for current configuration (board and memory)"
-  echo "  or"
-  echo "  -b/--board <name>: set board name from following list = ${BOARD_NAME_LIST[*]} (default: all)"
+  echo "  -h / --help: print this message"
+  echo "  -i / --install: update prebuilt images"
+  echo "  -r <level> / --rpmb=<level>:"
+  echo "      0: disable RPMB (default)"
+  echo "      1: enable RPMB with TESTKEY for anti-rollback only (TAKE CARE: CFG_RPMB_WRITE_KEY is enabled, fusing the TESTKEY on your device)"
+  echo "      2: enable RPMB with TESTKEY for secure storage (TAKE CARE: CFG_RPMB_WRITE_KEY is enabled, fusing the TESTKEY on your device)"
+  echo "  -v / --version: get script version"
+  echo "  --verbose=<level>: enable build verbosity"
+  echo "      0: no verbosity (default)"
+  echo "      1: remove script filtering"
+  echo "      2: remove script filtering and quiet option for the build"
+  echo "  -d <level> / --debug=<level>: TEE debug level"
+  echo "      0: no debug (default)"
+  echo "      1: TEE core and TA log level 2"
+  echo "      2: TEE core and TA log level 3"
+  echo "  -b <name> / --board=<name>: set board name from following list = ${DEFAULT_BOARD_NAME_LIST[*]} (default: all)"
   empty_line
   echo "Command: Optional, only one command at a time supported"
   echo "  clean: execute make clean on targeted module"
@@ -260,35 +290,27 @@ in_list()
 #######################################
 init_nb_states()
 {
-  if [[ ${do_all_board} == 1 ]]; then
-    for board_name in "${BOARD_NAME_LIST[@]}"
-    do
-      if [ ${do_onlyclean} == 1 ]; then
-        nb_states=$((nb_states+1))
-      else
-        nb_states=$((nb_states+1))
-        if [[ ${do_install} == 1 ]]; then
-          nb_states=$((nb_states+1))
-        fi
-      fi
-    done
+  if [ ${do_onlyclean} == 1 ]; then
+    nb_states=$((nb_states+1))
   else
-    if [ ${do_onlyclean} == 1 ]; then
+    nb_states=$((nb_states+1))
+    if [[ ${do_install} == 1 ]]; then
       nb_states=$((nb_states+1))
-    else
-      nb_states=$((nb_states+1))
-      if [[ ${do_install} == 1 ]]; then
-        nb_states=$((nb_states+1))
-      fi
     fi
   fi
+
+  board_nb=${#board_name_list[@]}
+  nb_states=$((nb_states*${board_nb}))
+
+  soc_nb=${#SOC_VERSIONS[@]}
+  nb_states=$((nb_states*${soc_nb}))
 }
 
 #######################################
 # Update board flavour based on board name
 # Globals:
-#   I BOARD_NAME_LIST
-#   I BOARD_FLAVOUR_LIST
+#   I DEFAULT_BOARD_NAME_LIST
+#   I DEFAULT_BOARD_FLAVOUR_LIST
 #   O board_flavour
 # Arguments:
 #   $1 = Board name
@@ -297,10 +319,10 @@ init_nb_states()
 #######################################
 update_board_flavour()
 {
-  if [[ $1 == ${BOARD_NAME_LIST[0]} ]]; then
-    board_flavour=${BOARD_FLAVOUR_LIST[0]}
+  if [[ $1 == ${DEFAULT_BOARD_NAME_LIST[0]} ]]; then
+    board_flavour=${DEFAULT_BOARD_FLAVOUR_LIST[0]}
   else
-    board_flavour=${BOARD_FLAVOUR_LIST[1]}
+    board_flavour=${DEFAULT_BOARD_FLAVOUR_LIST[1]}
   fi
 }
 
@@ -354,10 +376,10 @@ extract_buildconfig()
 #######################################
 generate_tee()
 {
-  \make ${verbose} -j8 -C ${tee_src} O=${TEE_OUT}/${board_name} ARCH="${TEE_ARCH}" \
-    CROSS_COMPILE=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
-    CFG_TEE_CORE_DEBUG=n CFG_TEE_CORE_LOG_LEVEL=2 PLATFORM=${SOC_FAMILY} \
-    CFG_SECURE_DT=${tee_dtb} $1 &>${redirect_out}
+  \make ${verbose} -j8 -C ${tee_src} O=${TEE_OUT}/${soc_version}-${board_flavour} \
+    ARCH="${TEE_ARCH}" CROSS_COMPILE=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
+    ${tee_debug} ${tee_config} PLATFORM=${SOC_FAMILY} \
+    CFG_EMBED_DTB_SOURCE_FILE=${tee_dtb}.dts $1 &>${redirect_out}
 
   if [ $? -ne 0 ]; then
     error "Not possible to generate the OP-TEE OS images"
@@ -378,7 +400,7 @@ generate_tee()
 #   I TEE_EXT
 #   I TEE_ELF_EXT
 #   I TEE_PREBUILT_PATH
-#   I SOC_VERSION
+#   I soc_version
 # Arguments:
 #   None
 # Returns:
@@ -386,11 +408,20 @@ generate_tee()
 #######################################
 install_tee()
 {
-  \find ${TEE_OUT}/${board_name}/ -name "${TEE_HEADER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/optee_os/${TEE_HEADER}-${SOC_VERSION}-${board_flavour}.${TEE_EXT}
-  \find ${TEE_OUT}/${board_name}/ -name "${TEE_PAGEABLE}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/optee_os/${TEE_PAGEABLE}-${SOC_VERSION}-${board_flavour}.${TEE_EXT}
-  \find ${TEE_OUT}/${board_name}/ -name "${TEE_PAGER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/optee_os/${TEE_PAGER}-${SOC_VERSION}-${board_flavour}.${TEE_EXT}
-  \cp -rf ${TEE_OUT}/${board_name}/export-ta_arm32/* ${TEE_PREBUILT_PATH}/${board_name}/export-ta_arm32/
-  \find ${TEE_OUT}/${board_name}/ -name "tee.${TEE_ELF_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/optee_os/tee-${SOC_VERSION}-${board_flavour}.${TEE_ELF_EXT}
+  if [ ! -d "${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}" ]; then
+    \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}
+    \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os
+    \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32
+  fi
+
+  \rm -rf ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/*
+  \rm -rf ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32/*
+
+  \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_HEADER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_HEADER}-${soc_version}-${board_flavour}.${TEE_EXT}
+  \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGEABLE}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGEABLE}-${soc_version}-${board_flavour}.${TEE_EXT}
+  \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGER}-${soc_version}-${board_flavour}.${TEE_EXT}
+  \cp -rf ${TEE_OUT}/${soc_version}-${board_flavour}/export-ta_arm32/* ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32/
+  \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "tee.${TEE_ELF_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/tee-${soc_version}-${board_flavour}.${TEE_ELF_EXT}
 }
 
 #######################################
@@ -407,66 +438,156 @@ if [[ "$0" != "$BASH_SOURCE" ]]; then
   return
 fi
 
-# Check the current usage
-if [ $# -gt 5 ]
-then
-  usage
-  popd >/dev/null 2>&1
-  exit 0
-fi
-
-while test "$1" != ""; do
-  arg=$1
-  case $arg in
-    "-h"|"--help" )
+# check the options
+while getopts "hvir:d:b:-:" option; do
+  case "${option}" in
+    -)
+      # Treat long options
+      case "${OPTARG}" in
+        help)
+          usage
+          popd >/dev/null 2>&1
+          exit 0
+          ;;
+        version)
+          echo "`basename $0` version ${SCRIPT_VERSION}"
+          \popd >/dev/null 2>&1
+          exit 0
+          ;;
+        install)
+          do_install=1
+          ;;
+        rpmb=*)
+          rpmb_level=${OPTARG#*=}
+          if ! in_list "0 1 2" "${rpmb_level}"; then
+            error "unknown rpmb level ${rpmb_level}"
+            \popd >/dev/null 2>&1
+            exit 1
+          fi
+          if [ ${rpmb_level} != 0 ]; then
+            enable_rpmb=1
+          fi
+          ;;
+        verbose=*)
+          verbose_level=${OPTARG#*=}
+          if ! in_list "0 1 2" "${verbose_level}"; then
+            error "unknown verbose level ${verbose_level}"
+            \popd >/dev/null 2>&1
+            exit 1
+          fi
+          if [ ${verbose_level} != 0 ];then
+            redirect_out="/dev/stdout"
+          fi
+          if [ ${verbose_level} == 2 ];then
+            verbose=
+          fi
+          ;;
+        debug=*)
+          debug_arg=${OPTARG#*=}
+          case ${debug_arg} in
+            "0" )
+            tee_debug=${TEE_DEBUG_0}
+            ;;
+            "1" )
+            tee_debug=${TEE_DEBUG_2}
+            ;;
+            "2" )
+            tee_debug=${TEE_DEBUG_3}
+            ;;
+            ** )
+              error "unknown debug level ${debug_arg}"
+              \popd >/dev/null 2>&1
+              exit 1
+              ;;
+          esac
+          ;;
+        board=*)
+          board_arg=${OPTARG#*=}
+          if ! in_list "${DEFAULT_BOARD_NAME_LIST[*]}" "${board_arg}"; then
+            error "unknown board name ${board_arg}"
+            popd >/dev/null 2>&1
+            exit 1
+          fi
+          board_name_list=( "${board_arg}" )
+          ;;
+        *)
+          usage
+          popd >/dev/null 2>&1
+          exit 1
+          ;;
+      esac;;
+    # Treat short options
+    h)
       usage
       popd >/dev/null 2>&1
       exit 0
       ;;
-
-    "-v"|"--version" )
+    v)
       echo "`basename $0` version ${SCRIPT_VERSION}"
       \popd >/dev/null 2>&1
       exit 0
       ;;
-
-    "-i"|"--install" )
+    i)
       do_install=1
       ;;
-
-    "--verbose" )
-      verbose_level=${2}
-      redirect_out="/dev/stdout"
-      if ! in_list "0 1 2" "${verbose_level}"; then
-        error "unknown verbose level ${verbose_level}"
+    r)
+      rpmb_level=${OPTARG}
+      if ! in_list "0 1 2" "${rpmb_level}"; then
+        error "unknown rpmb level ${rpmb_level}"
         \popd >/dev/null 2>&1
         exit 1
       fi
-      if [ ${verbose_level} == 2 ];then
-        verbose=
+      if [ ${rpmb_level} != 0 ]; then
+        enable_rpmb=1
       fi
-      shift
       ;;
-
-    "-c"|"--current" )
-      if [ -n "${ANDROID_DEFAULT_BOARDNAME+1}" ]; then
-        board_name=${ANDROID_DEFAULT_BOARDNAME}
-        do_all_board=0
-      else
-        echo "ANDROID_DEFAULT_BOARDNAME not defined !"
-        echo "Please execute \"source ./build/envsetup.sh\" followed by \"lunch\" with appropriate target"
-        \popd >/dev/null 2>&1
-        exit 0
+    d)
+      case ${OPTARG} in
+        "0" )
+        tee_debug=${TEE_DEBUG_0}
+        ;;
+        "1" )
+        tee_debug=${TEE_DEBUG_2}
+        ;;
+        "2" )
+        tee_debug=${TEE_DEBUG_3}
+        ;;
+        ** )
+          error "unknown debug level ${OPTARG}"
+          \popd >/dev/null 2>&1
+          exit 1
+          ;;
+      esac
+      ;;
+    b)
+      if ! in_list "${DEFAULT_BOARD_NAME_LIST[*]}" "${OPTARG}"; then
+        error "unknown board name ${OPTARG}"
+        popd >/dev/null 2>&1
+        exit 1
       fi
-      do_current=1
+      board_name_list=( "${OPTARG}" )
       ;;
-
-    "-b"|"--board" )
-      board_name=$2
-      do_all_board=0
-      shift
+    *)
+      usage
+      popd >/dev/null 2>&1
+      exit 1
       ;;
+  esac
+done
 
+shift $((OPTIND-1))
+
+if [ $# -gt 1 ]; then
+  error "Only one command resquest supported. Current commands are : $*"
+  usage
+  popd >/dev/null 2>&1
+  exit 1
+fi
+
+# check the command if available
+if [ $# -eq 1 ]; then
+
+  case $1 in
     "clean" )
       do_onlyclean=1
       ;;
@@ -474,11 +595,10 @@ while test "$1" != ""; do
     ** )
       usage
       popd >/dev/null 2>&1
-      exit 0
+      exit 1
       ;;
   esac
-  shift
-done
+fi
 
 # Check existence of the TEE build configuration file
 if [[ ! -f ${TEE_SOURCE_PATH}/${TEE_BUILDCONFIG} ]]; then
@@ -506,63 +626,62 @@ fi
 # Initialize number of build states
 init_nb_states
 
-if [[ ${do_all_board} == 1 ]]; then
-  for board_name in "${BOARD_NAME_LIST[@]}"
+for soc_version in "${SOC_VERSIONS[@]}"
+do
+  for board_name in "${board_name_list[@]}"
   do
     update_board_flavour "${board_name}"
 
     # Create TEE out directory
-    \mkdir -p ${TEE_OUT}/${board_name}
+    \mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}
 
     # Set TEE DTB name used
-    tee_dtb=${SOC_VERSION}-${board_flavour}
+    tee_dtb=${soc_version}-${board_flavour}
+
+    # Set TEE config depending on board capability
+    tee_config=""
+    if [ ${board_name} == "eval" ]; then
+      case ${rpmb_level} in
+        "1" )
+        tee_config=${TEE_RPMB_CONFIG_1}
+        ;;
+        "2" )
+        tee_config=${TEE_RPMB_CONFIG_2}
+        ;;
+      esac
+    fi
 
     if [ ${do_onlyclean} == 1 ]; then
-      state "Clean out directory for ${board_name}"
+      state "Clean out directory for ${soc_version}-${board_flavour} board"
       generate_tee clean
     else
       # Build TEE
-      state "Generate OP-TEE OS images for ${board_name}"
+      state "Generate OP-TEE OS images for ${soc_version}-${board_flavour} board"
       generate_tee all
 
       if [[ ${do_install} == 1 ]]; then
         # Update prebuilt images in required directory
-        state "Update prebuilt images for ${board_name}"
+        state "Update prebuilt images for ${soc_version}-${board_flavour} board"
         install_tee
       fi
-
     fi
   done
+done
+
+if [ ${enable_rpmb} == 1 ]; then
+  empty_line
+  blue "  RPMB has been enabled with ${tee_config}"
+  empty_line
+  blue "  It's recommended to disable de RPMB emulator in the tee-supplicant:"
+  blue "    Set \"RPMB_EMU := 0\" in device/stm/stm32mp1/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
+  empty_line
+  blue "  Reminder: the RPMB key (TESTKEY) will be definitively provisioned (fuse) on the device, if not already performed"
 else
-  # Check board name
-  if in_list "${BOARD_NAME_LIST[*]}" "${board_name}"; then
-    update_board_flavour "${board_name}"
-  else
-    error "unknown board name ${board_name}"
-    popd >/dev/null 2>&1
-    exit 1
-  fi
-
-  # Create TEE out directory
-  \mkdir -p ${TEE_OUT}/${board_name}
-
-  # Set TEE DTB name used
-  tee_dtb=${SOC_VERSION}-${board_flavour}
-
-  if [ ${do_onlyclean} == 1 ]; then
-    state "Clean out directory for ${board_name}"
-    generate_tee clean
-  else
-    # Build TEE
-    state "Generate OP-TEE OS images for ${board_name}"
-    generate_tee all
-
-    if [[ ${do_install} == 1 ]]; then
-      # Update prebuilt images in required directory
-      state "Update prebuilt images for ${board_name}"
-      install_tee
-    fi
-  fi
+  empty_line
+  blue "  RPMB has been disabled"
+  empty_line
+  blue "  It's recommended to enable de RPMB emulator in the tee-supplicant:"
+  blue "    Set \"RPMB_EMU := 1\" in device/stm/stm32mp1/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
 fi
 
 popd >/dev/null 2>&1

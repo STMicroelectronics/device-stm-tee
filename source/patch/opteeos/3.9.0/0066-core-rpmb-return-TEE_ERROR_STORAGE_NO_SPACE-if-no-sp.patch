@@ -1,0 +1,42 @@
+From 94eb24353d6ea930be3236cf12439ee91df94b6c Mon Sep 17 00:00:00 2001
+From: Stefan Schmidt <snst@meek.de>
+Date: Sat, 5 Dec 2020 13:44:17 +0100
+Subject: [PATCH 07/10] core: rpmb: return TEE_ERROR_STORAGE_NO_SPACE if no
+ space left
+
+So far the error TEE_ERROR_OUT_OF_MEMORY was returned if no
+free memory could be allocated in the RPMB to store new data.
+According to TEE Internal Core API Specification the error
+TEE_ERROR_STORAGE_NO_SPACE shall be returned if insufficient
+space is available to create the persistent object.
+
+Signed-off-by: Stefan Schmidt <snst@meek.de>
+Reviewed-by: Jerome Forissier <jerome@forissier.org>
+Acked-by: Jens Wiklander <jens.wiklander@linaro.org>
+Reviewed-by: Etienne Carriere <etienne.carriere@linaro.org>
+---
+ core/tee/tee_rpmb_fs.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/core/tee/tee_rpmb_fs.c b/core/tee/tee_rpmb_fs.c
+index ddf22a6..ea395de 100644
+--- a/core/tee/tee_rpmb_fs.c
++++ b/core/tee/tee_rpmb_fs.c
+@@ -2340,8 +2340,13 @@ static TEE_Result rpmb_fs_write_primitive(struct rpmb_file_handle *fh,
+ 		DMSG("Need to re-allocate");
+ 		newsize = MAX(end, fh->fat_entry.data_size);
+ 		mm = tee_mm_alloc(&p, newsize);
++		if (!mm) {
++			DMSG("RPMB: No space left");
++			res = TEE_ERROR_STORAGE_NO_SPACE;
++			goto out;
++		}
+ 		newbuf = calloc(1, newsize);
+-		if (!mm || !newbuf) {
++		if (!newbuf) {
+ 			res = TEE_ERROR_OUT_OF_MEMORY;
+ 			goto out;
+ 		}
+-- 
+2.17.1
+

@@ -1,0 +1,32 @@
+From f225fcd574160be721c740a5c746f9e3de000f3a Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Thu, 6 Aug 2020 16:14:23 +0200
+Subject: [PATCH 6/6] keymaster: ta: remove unused elements (warnings)
+
+---
+ keymaster/ta/crypto_ec.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/keymaster/ta/crypto_ec.c b/keymaster/ta/crypto_ec.c
+index 87d6d1b..0c6b554 100644
+--- a/keymaster/ta/crypto_ec.c
++++ b/keymaster/ta/crypto_ec.c
+@@ -23,7 +23,6 @@ static keymaster_error_t TA_check_ec_data_size(uint8_t **data, uint32_t *data_l,
+ {
+ 	keymaster_error_t res = KM_ERROR_OK;
+ 	uint32_t key_size_bytes = (key_size + 7) / 8;
+-	uint8_t *ptr = NULL;
+ 
+ 	/*
+ 	 * If the data provided for signing
+@@ -43,7 +42,6 @@ static keymaster_error_t TA_check_ec_data_size(uint8_t **data, uint32_t *data_l,
+ 				8 - (key_size & 0x7));
+ 		}
+ 	}
+-out:
+ 	return res;
+ }
+ 
+-- 
+2.17.1
+

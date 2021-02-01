@@ -1,0 +1,36 @@
+From e97af51b0f31d466703048ce2dfee281d06af3b3 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Thu, 12 Nov 2020 14:14:07 +0100
+Subject: [PATCH 3/3] arm: plat-stm32mp1: increase xlat number of pre-allocated
+ tables
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ core/arch/arm/plat-stm32mp1/platform_config.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/core/arch/arm/plat-stm32mp1/platform_config.h b/core/arch/arm/plat-stm32mp1/platform_config.h
+index 0ea5efc..4b102c4 100644
+--- a/core/arch/arm/plat-stm32mp1/platform_config.h
++++ b/core/arch/arm/plat-stm32mp1/platform_config.h
+@@ -22,7 +22,7 @@
+  * - two tables for TEE RAM fine grain mapping [2ffc.0000 301f.ffff]
+  * - one table for a 2MByte dynamic shared virtual memory (SHM_VASPACE)
+  */
+-#define MAX_XLAT_TABLES			4
++#define MAX_XLAT_TABLES			7
+ #else
+ /*
+  * Optimize unpaged memory size:
+@@ -31,7 +31,7 @@
+  * - one table for non-secure internal RAMs (PM: DDR first page)
+  * - two tables for a 2MByte dynamiq shared virtual memory (SHM_VASPACE)
+  */
+-#define MAX_XLAT_TABLES			6
++#define MAX_XLAT_TABLES			9
+ #endif /*CFG_WITH_LPAE*/
+ #else
+ /* Be generous with this setup that has plenty of secure RAM */
+-- 
+2.17.1
+

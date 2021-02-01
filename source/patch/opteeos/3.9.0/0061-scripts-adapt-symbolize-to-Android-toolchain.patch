@@ -1,0 +1,29 @@
+From c10340754a117a63ebadcd68431f6270f9c4eed4 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Mon, 1 Feb 2021 09:21:46 +0100
+Subject: [PATCH 02/10] scripts: adapt symbolize to Android toolchain
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ scripts/symbolize.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/symbolize.py b/scripts/symbolize.py
+index 0eea9d7..29f0750 100755
+--- a/scripts/symbolize.py
++++ b/scripts/symbolize.py
+@@ -133,9 +133,9 @@ class Symbolizer(object):
+         output = p.stdout.readlines()
+         p.terminate()
+         if b'ARM aarch64,' in output[0]:
+-            self._arch = 'aarch64-linux-gnu-'
++            self._arch = 'aarch64-linux-android-'
+         elif b'ARM,' in output[0]:
+-            self._arch = 'arm-linux-gnueabihf-'
++            self._arch = 'arm-linux-androideabi-'
+ 
+     def arch_prefix(self, cmd, elf):
+         self.set_arch(elf)
+-- 
+2.17.1
+

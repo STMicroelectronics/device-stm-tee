@@ -1,0 +1,83 @@
+From 17a8adb5dc947906d55251051ca7511c2f1fea8b Mon Sep 17 00:00:00 2001
+From: Olivier Masse <olivier.masse@nxp.com>
+Date: Thu, 7 May 2020 14:07:21 +0200
+Subject: [PATCH 5/6] km: ta: ECDSA: Remove digest padding
+
+Android VTS keymaster test failed to verify signature with openssl
+as Digest is not padded to the size of the ECDSA private key.
+(Keymaster TA was allocating a new buffer if digest is smaller than key size
+and copy the digest at then end of the buffer.)
+
+The fix is resolving the following VTS testcase:
+VerificationOperationsTest.EcdsaAllDigestsAndCurves
+
+Signed-off-by: Olivier Masse <olivier.masse@nxp.com>
+---
+ keymaster/ta/crypto_ec.c | 22 +++-------------------
+ 1 file changed, 3 insertions(+), 19 deletions(-)
+
+diff --git a/keymaster/ta/crypto_ec.c b/keymaster/ta/crypto_ec.c
+index f1ef908..87d6d1b 100644
+--- a/keymaster/ta/crypto_ec.c
++++ b/keymaster/ta/crypto_ec.c
+@@ -19,7 +19,7 @@
+ #include "mbedtls_proxy.h"
+ 
+ static keymaster_error_t TA_check_ec_data_size(uint8_t **data, uint32_t *data_l,
+-				const uint32_t key_size, bool *clear_in_buf)
++				const uint32_t key_size)
+ {
+ 	keymaster_error_t res = KM_ERROR_OK;
+ 	uint32_t key_size_bytes = (key_size + 7) / 8;
+@@ -42,19 +42,6 @@ static keymaster_error_t TA_check_ec_data_size(uint8_t **data, uint32_t *data_l,
+ 			TA_short_be_rshift(*data, *data_l,
+ 				8 - (key_size & 0x7));
+ 		}
+-	} else {
+-		ptr = TEE_Malloc(key_size_bytes, TEE_MALLOC_FILL_ZERO);
+-		if (!ptr) {
+-			EMSG("Failed to allocate memory for extended data");
+-			res = KM_ERROR_MEMORY_ALLOCATION_FAILED;
+-			goto out;
+-		}
+-		TEE_MemMove(ptr + (key_size_bytes - *data_l), *data, *data_l);
+-		*data_l = key_size_bytes;
+-		if (*clear_in_buf)
+-			TEE_Free(*data);
+-		*data = ptr;
+-		*clear_in_buf = true;
+ 	}
+ out:
+ 	return res;
+@@ -102,7 +89,6 @@ keymaster_error_t TA_ec_finish(const keymaster_operation_t *operation,
+ 	uint8_t digest_out[KM_MAX_DIGEST_SIZE];
+ 	uint8_t *in_buf = NULL;
+ 	uint32_t in_buf_l = 0;
+-	bool clear_in_buf = false;
+ 
+ 	switch (operation->purpose) {
+ 	case KM_PURPOSE_VERIFY:
+@@ -132,10 +118,10 @@ keymaster_error_t TA_ec_finish(const keymaster_operation_t *operation,
+ 		/* If the data provided for unpadded signing or
+ 		 * verification is too long, truncate it.
+ 		 */
+-		res = TA_check_ec_data_size(&in_buf, &in_buf_l, key_size,
+-						&clear_in_buf);
++		res = TA_check_ec_data_size(&in_buf, &in_buf_l, key_size);
+ 		if (res != KM_ERROR_OK)
+ 			break;
++
+ 		if (operation->purpose == KM_PURPOSE_SIGN) {
+ 			res = TEE_AsymmetricSignDigest(*operation->operation,
+ 							NULL, 0, in_buf,
+@@ -170,7 +156,5 @@ keymaster_error_t TA_ec_finish(const keymaster_operation_t *operation,
+ 	default:
+ 		res = KM_ERROR_UNSUPPORTED_PURPOSE;
+ 	}
+-	if (in_buf && clear_in_buf)
+-		TEE_Free(in_buf);
+ 	return res;
+ }
+-- 
+2.17.1
+

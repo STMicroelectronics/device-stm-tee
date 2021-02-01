@@ -1,0 +1,34 @@
+From fabd7129d21a36300abf4066c545ffd9b5d97b9d Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Mon, 2 Nov 2020 09:23:37 +0100
+Subject: [PATCH] kmgk: remove optee interface instance
+
+Only default interface instance is started
+---
+ gatekeeper/android.hardware.gatekeeper@1.0-service.optee.rc   | 1 -
+ keymaster/3.0/android.hardware.keymaster@3.0-service.optee.rc | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/gatekeeper/android.hardware.gatekeeper@1.0-service.optee.rc b/gatekeeper/android.hardware.gatekeeper@1.0-service.optee.rc
+index ea26305..dd59dba 100644
+--- a/gatekeeper/android.hardware.gatekeeper@1.0-service.optee.rc
++++ b/gatekeeper/android.hardware.gatekeeper@1.0-service.optee.rc
+@@ -1,5 +1,4 @@
+ service vendor.gatekeeper-1-0-optee /vendor/bin/hw/android.hardware.gatekeeper@1.0-service.optee
+-    interface android.hardware.gatekeeper@1.0::IGatekeeper optee
+     interface android.hardware.gatekeeper@1.0::IGatekeeper default
+     class hal
+     user system
+diff --git a/keymaster/3.0/android.hardware.keymaster@3.0-service.optee.rc b/keymaster/3.0/android.hardware.keymaster@3.0-service.optee.rc
+index 769f98d..130c7df 100644
+--- a/keymaster/3.0/android.hardware.keymaster@3.0-service.optee.rc
++++ b/keymaster/3.0/android.hardware.keymaster@3.0-service.optee.rc
+@@ -1,5 +1,4 @@
+ service vendor.keymaster-3-0-optee /vendor/bin/hw/android.hardware.keymaster@3.0-service.optee
+-    interface android.hardware.keymaster@3.0::IKeymasterDevice optee
+     interface android.hardware.keymaster@3.0::IKeymasterDevice default
+     class early_hal
+     user system
+-- 
+2.17.1
+

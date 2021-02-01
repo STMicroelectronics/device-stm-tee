@@ -19,17 +19,15 @@
 #######################################
 # Constants
 #######################################
-SCRIPT_VERSION="1.0"
+SCRIPT_VERSION="1.1"
 
 SOC_FAMILY="stm32mp1"
 SOC_NAME="stm32mp15"
-SOC_VERSION="stm32mp157c"
+SOC_VERSIONS=( "stm32mp157c" "stm32mp157f" )
 
 # OP-TEE
-TEE_VERSION=3.3.0
 TEE_ARCH=arm
-
-TEE_TOOLCHAIN=gcc-arm-8.2-2019.01-x86_64-arm-eabi
+TEE_TOOLCHAIN=gcc-arm-9.2-2019.12-x86_64-arm-none-eabi
 
 if [ -n "${ANDROID_BUILD_TOP+1}" ]; then
   TOP_PATH=${ANDROID_BUILD_TOP}
@@ -48,12 +46,13 @@ TEE_SOURCE_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/source
 TEE_PREBUILT_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/prebuilt
 
 TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/gcc/linux-x86/arm/${TEE_TOOLCHAIN}/bin
-TEE_CROSS_COMPILE=arm-eabi-
+TEE_CROSS_COMPILE=arm-none-eabi-
 
 TEE_OUT=${TOP_PATH}/out-bsp/${SOC_FAMILY}/TEE_OBJ
 
-# Board name and flavour shall be listed in associated order
-BOARD_NAME_LIST=( "eval" )
+# Board name and flavour shall be listed in associated order (max : two boards)
+DEFAULT_BOARD_NAME_LIST=( "eval" )
+DEFAULT_BOARD_FLAVOUR_LIST=( "ev1" )
 
 #######################################
 # Variables
@@ -61,14 +60,13 @@ BOARD_NAME_LIST=( "eval" )
 nb_states=1
 do_install=0
 
-do_all_board=1
-board_name=
-
 verbose="--quiet"
 verbose_level=0
 
 # By default redirect stdout and stderr to /dev/null
 redirect_out="/dev/null"
+
+board_name_list=("${DEFAULT_BOARD_NAME_LIST[@]}")
 
 #######################################
 # Functions
@@ -104,15 +102,11 @@ usage()
   echo "  This script allows building the trust applications (TA) source listed in ${TA_BUILDCONFIG} file"
   empty_line
   echo "Options:"
-  echo "  -h/--help: print this message"
-  echo "  -i/--install: update prebuilt images"
-  echo "  -v/--version: get script version"
-  echo "  --verbose <level>: enable verbosity (1 or 2 depending on level of verbosity required)"
-  empty_line
-  echo "Board options:"
-  echo "  -c/--current: build only for current configuration (board and memory)"
-  echo "  or"
-  echo "  -b/--board <name>: set board name from following list = ${BOARD_NAME_LIST[*]} (default: all)"
+  echo "  -h / --help: print this message"
+  echo "  -i / --install: update prebuilt images"
+  echo "  -v / --version: get script version"
+  echo "  --verbose=<level>: enable verbosity (1 or 2 depending on level of verbosity required)"
+  echo "  -b <name> / --board=<name>: set board name from following list = ${DEFAULT_BOARD_NAME_LIST[*]} (default: all)"
   empty_line
 }
 
@@ -264,8 +258,30 @@ init_nb_states()
     fi
   done < ${TEE_SOURCE_PATH}/${TA_BUILDCONFIG}
 
-  if [[ ${do_all_board} == 1 ]]; then
-    nb_states=$((nb_states+nb_states))
+  board_nb=${#board_name_list[@]}
+  nb_states=$((nb_states*${board_nb}))
+
+  soc_nb=${#SOC_VERSIONS[@]}
+  nb_states=$((nb_states*${soc_nb}))
+}
+
+#######################################
+# Update board flavour based on board name
+# Globals:
+#   I DEFAULT_BOARD_NAME_LIST
+#   I DEFAULT_BOARD_FLAVOUR_LIST
+#   O board_flavour
+# Arguments:
+#   $1 = Board name
+# Returns:
+#   None
+#######################################
+update_board_flavour()
+{
+  if [[ $1 == ${DEFAULT_BOARD_NAME_LIST[0]} ]]; then
+    board_flavour=${DEFAULT_BOARD_FLAVOUR_LIST[0]}
+  else
+    board_flavour=${DEFAULT_BOARD_FLAVOUR_LIST[1]}
   fi
 }
 
@@ -286,10 +302,10 @@ init_nb_states()
 #######################################
 generate_ta()
 {
-  mkdir -p ${TEE_OUT}/${board_name}/ta/${ta_dir}
+  mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}/ta/${ta_dir}
 
-  \make ${verbose} -j8 -C ${ta_src} O=${TEE_OUT}/${board_name}/ta/${ta_dir} \
-    TA_DEV_KIT_DIR=${TEE_PREBUILT_PATH}/${board_name}/export-ta_arm32 \
+  \make ${verbose} -j8 -C ${ta_src} O=${TEE_OUT}/${soc_version}-${board_flavour}/ta/${ta_dir} \
+    TA_DEV_KIT_DIR=${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32 \
     CROSS_COMPILE=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} &>${redirect_out}
 
   if [ $? -ne 0 ]; then
@@ -339,23 +355,25 @@ generate_all_ta()
       ta_value=($(echo $line | awk '{ print $1 }'))
 
       case ${ta_value} in
+      "DIR" )
+        ta_dir=($(echo $line | awk '{ print $2 }'))
+        ;;
       "SRC" )
         tmp_src=($(echo $line | awk '{ print $2 }'))
         ta_src=($(realpath ${tmp_src}))
         check_ta_src
-        ta_dir=($(basename ${tmp_src}))
         build_ta=0
         ;;
       "NAME" )
         ta_name=($(echo $line | awk '{ print $2 }'))
         if [[ ${build_ta} == 0 ]]; then
-          state "Generate TA ${ta_dir} (${ta_name}) for ${board_name}"
+          state "Generate TA ${ta_dir} (${ta_name}) for ${soc_version}-${board_flavour} board"
           generate_ta
           build_ta=1
         fi
         if [[ ${do_install} == 1 ]]; then
-          state "Update prebuilt image for the TA ${ta_dir} (${ta_name}) for ${board_name}"
-          \find ${TEE_OUT}/${board_name}/ta/ -name "${ta_name}.ta" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${board_name}/ta/${ta_name}.ta
+          state "Update prebuilt image for the TA ${ta_dir} (${ta_name}) for ${soc_version}-${board_flavour} board"
+          \find ${TEE_OUT}/${soc_version}-${board_flavour}/ta/ -name "${ta_name}.ta" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/ta/${ta_name}.ta
         fi
         ;;
       esac
@@ -377,75 +395,92 @@ if [[ "$0" != "$BASH_SOURCE" ]]; then
   return
 fi
 
-# Check the current usage
-if [ $# -gt 5 ]
-then
-  usage
-  popd >/dev/null 2>&1
-  exit 0
-fi
-
-while test "$1" != ""; do
-  arg=$1
-  case $arg in
-    "-h"|"--help" )
+# check the options
+while getopts "hvib:-:" option; do
+  case "${option}" in
+    -)
+      # Treat long options
+      case "${OPTARG}" in
+        help)
+          usage
+          popd >/dev/null 2>&1
+          exit 0
+          ;;
+        version)
+          echo "`basename $0` version ${SCRIPT_VERSION}"
+          \popd >/dev/null 2>&1
+          exit 0
+          ;;
+        install)
+          nb_states=$((nb_states+1))
+          do_install=1
+          ;;
+        verbose=*)
+          verbose_level=${OPTARG#*=}
+          redirect_out="/dev/stdout"
+          if ! in_list "0 1 2" "${verbose_level}"; then
+            error "unknown verbose level ${verbose_level}"
+            \popd >/dev/null 2>&1
+            exit 1
+          fi
+          if [ ${verbose_level} == 2 ];then
+            verbose=
+          fi
+          ;;
+        board=*)
+          board_arg=${OPTARG#*=}
+          if ! in_list "${DEFAULT_BOARD_NAME_LIST[*]}" "${board_arg}"; then
+            error "unknown board name ${board_arg}"
+            popd >/dev/null 2>&1
+            exit 1
+          fi
+          board_name_list=( "${board_arg}" )
+          ;;
+        *)
+          usage
+          popd >/dev/null 2>&1
+          exit 1
+          ;;
+      esac;;
+    # Treat short options
+    h)
       usage
       popd >/dev/null 2>&1
       exit 0
       ;;
-
-    "-v"|"--version" )
+    v)
       echo "`basename $0` version ${SCRIPT_VERSION}"
       \popd >/dev/null 2>&1
       exit 0
       ;;
-
-    "-i"|"--install" )
+    i)
       nb_states=$((nb_states+1))
       do_install=1
       ;;
-
-    "--verbose" )
-      verbose_level=${2}
-      redirect_out="/dev/stdout"
-      if ! in_list "0 1 2" "${verbose_level}"; then
-        error "unknown verbose level ${verbose_level}"
-        \popd >/dev/null 2>&1
+    b)
+      if ! in_list "${DEFAULT_BOARD_NAME_LIST[*]}" "${OPTARG}"; then
+        error "unknown board name ${OPTARG}"
+        popd >/dev/null 2>&1
         exit 1
       fi
-      if [ ${verbose_level} == 2 ];then
-        verbose=
-      fi
-      shift
+      board_name_list=( "${OPTARG}" )
       ;;
-
-    "-c"|"--current" )
-      if [ -n "${ANDROID_DEFAULT_BOARDNAME+1}" ]; then
-        board_name=${ANDROID_DEFAULT_BOARDNAME}
-        do_all_board=0
-      else
-        echo "ANDROID_DEFAULT_BOARDNAME not defined !"
-        echo "Please execute \"source ./build/envsetup.sh\" followed by \"lunch\" with appropriate target"
-        popd >/dev/null 2>&1
-        exit 0
-      fi
-      do_current=1
-      ;;
-
-    "-b"|"--board" )
-      board_name=$2
-      do_all_board=0
-      shift
-      ;;
-
-    ** )
+    *)
       usage
       popd >/dev/null 2>&1
-      exit 0
+      exit 1
       ;;
   esac
-  shift
 done
+
+shift $((OPTIND-1))
+
+if [ $# -gt 0 ]; then
+  error "Unknown command : $*"
+  usage
+  popd >/dev/null 2>&1
+  exit 1
+fi
 
 # Check existence of the TEE build configuration file
 if [[ ! -f ${TEE_SOURCE_PATH}/${TA_BUILDCONFIG} ]]; then
@@ -466,29 +501,23 @@ fi
 # Initialize number of build states
 init_nb_states
 
-# Start TA generation
-if [[ ${do_all_board} == 1 ]]; then
-  for board_name in "${BOARD_NAME_LIST[@]}"
+for soc_version in "${SOC_VERSIONS[@]}"
+do
+  for board_name in "${board_name_list[@]}"
   do
-    \mkdir -p ${TEE_OUT}/${board_name}/ta
-    if [[ ${do_install} == 1 ]]; then
-      \mkdir -p ${TEE_PREBUILT_PATH}/${board_name}/ta
+    update_board_flavour "${board_name}"
+
+    \mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}
+    \mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}/ta
+
+    if [[ ${do_install} == 1 ]] && [[ ! -d "${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/ta" ]]; then
+      \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}
+      \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/ta
     fi
+
     generate_all_ta
+
   done
-else
-  # Check board name
-  if in_list "${BOARD_NAME_LIST[*]}" "${board_name}"; then
-    \mkdir -p ${TEE_OUT}/${board_name}/ta
-    if [[ ${do_install} == 1 ]]; then
-      \mkdir -p ${TEE_PREBUILT_PATH}/${board_name}/ta
-    fi
-    generate_all_ta
-  else
-    error "unknown board name ${board_name}"
-    popd >/dev/null 2>&1
-    exit 1
-  fi
-fi
+done
 
 popd >/dev/null 2>&1
