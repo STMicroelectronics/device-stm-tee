@@ -1,5 +1,5 @@
 # auto-generated TEE configuration file
-# TEE version cc9262d
+# TEE version 8cd7642
 set(CFG_AES_GCM_TABLE_BASED y)
 set(CFG_ARM32_core y)
 set(CFG_ARM32_ldelf y)
