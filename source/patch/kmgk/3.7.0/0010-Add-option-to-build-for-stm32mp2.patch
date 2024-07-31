@@ -1,0 +1,26 @@
+From baf62b7ec64aa834dbca6e888a6fb857e55b62e7 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Wed, 8 Feb 2023 16:00:29 +0100
+Subject: [PATCH 10/11] Add option to build for stm32mp2
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ Android.mk | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Android.mk b/Android.mk
+index 9e6d629..dcb82e7 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -14,7 +14,7 @@
+ # limitations under the License.
+ #
+ 
+-ifneq ($(filter stm32mp1%, $(SOC_FAMILY)),)
++ifneq ($(filter stm32mp1% stm32mp2%, $(SOC_FAMILY)),)
+ 
+ LOCAL_PATH := $(call my-dir)
+ 
+-- 
+2.17.1
+

@@ -1,0 +1,238 @@
+From 8e45ad7622400e6f4c212a2544fe9c36fa5a0b5a Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Thu, 14 Oct 2021 16:56:42 +0200
+Subject: [PATCH 08/11] keymaster: update for Android 12
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ keymaster/3.0/optee_keymaster3_device.cpp | 54 +++++++++++------------
+ keymaster/optee_keymaster.cpp             | 10 ++---
+ 2 files changed, 32 insertions(+), 32 deletions(-)
+
+diff --git a/keymaster/3.0/optee_keymaster3_device.cpp b/keymaster/3.0/optee_keymaster3_device.cpp
+index 1811d1e..8694c7b 100644
+--- a/keymaster/3.0/optee_keymaster3_device.cpp
++++ b/keymaster/3.0/optee_keymaster3_device.cpp
+@@ -259,10 +259,10 @@ Return<ErrorCode> OpteeKeymaster3Device::addRngEntropy(const hidl_vec<uint8_t> &
+ 
+     if (data.size() == 0) return ErrorCode::OK;
+ 
+-    AddEntropyRequest request;
++    AddEntropyRequest request(3);
+     request.random_data.Reinitialize(data.data(), data.size());
+ 
+-    AddEntropyResponse response;
++    AddEntropyResponse response(3);
+     impl_->AddRngEntropy(request, &response);
+ 
+     rc = legacy_enum_conversion(response.error);
+@@ -376,10 +376,10 @@ exit:
+ 
+ Return<void> OpteeKeymaster3Device::generateKey(const hidl_vec<KeyParameter> &keyParams,
+                                           generateKey_cb _hidl_cb) {
+-    GenerateKeyRequest request;
++    GenerateKeyRequest request(3);
+     request.key_description.Reinitialize(KmParamSet(keyParams));
+ 
+-    GenerateKeyResponse response;
++    GenerateKeyResponse response(3);
+     impl_->GenerateKey(request, &response);
+ 
+     KeyCharacteristics resultCharacteristics;
+@@ -398,11 +398,11 @@ Return<void>  OpteeKeymaster3Device::getKeyCharacteristics(const hidl_vec<uint8_
+                                    const hidl_vec<uint8_t> &clientId,
+                                    const hidl_vec<uint8_t> &appData,
+                                    getKeyCharacteristics_cb _hidl_cb) {
+-    GetKeyCharacteristicsRequest request;
++    GetKeyCharacteristicsRequest request(3);
+     request.SetKeyMaterial(keyBlob.data(), keyBlob.size());
+     addClientAndAppData(clientId, appData, &request.additional_params);
+ 
+-    GetKeyCharacteristicsResponse response;
++    GetKeyCharacteristicsResponse response(3);
+     impl_->GetKeyCharacteristics(request, &response);
+ 
+     KeyCharacteristics resultCharacteristics;
+@@ -418,12 +418,12 @@ Return<void>  OpteeKeymaster3Device::importKey(const hidl_vec<KeyParameter> &par
+                                                KeyFormat keyFormat,
+                                                const hidl_vec<uint8_t> &keyData,
+                                                importKey_cb _hidl_cb) {
+-    ImportKeyRequest request;
++    ImportKeyRequest request(3);
+     request.key_description.Reinitialize(KmParamSet(params));
+     request.key_format = legacy_enum_conversion(keyFormat);
+-    request.SetKeyMaterial(keyData.data(), keyData.size());
++    request.key_data = KeymasterKeyBlob(keyData.data(), keyData.size());
+ 
+-    ImportKeyResponse response;
++    ImportKeyResponse response(3);
+     impl_->ImportKey(request, &response);
+ 
+     KeyCharacteristics resultCharacteristics;
+@@ -442,12 +442,12 @@ Return<void>  OpteeKeymaster3Device::exportKey(KeyFormat exportFormat,
+                                                const hidl_vec<uint8_t> &clientId,
+                                                const hidl_vec<uint8_t> &appData,
+                                                exportKey_cb _hidl_cb) {
+-    ExportKeyRequest request;
++    ExportKeyRequest request(3);
+     request.key_format = legacy_enum_conversion(exportFormat);
+     request.SetKeyMaterial(keyBlob.data(), keyBlob.size());
+     addClientAndAppData(clientId, appData, &request.additional_params);
+ 
+-    ExportKeyResponse response;
++    ExportKeyResponse response(3);
+     impl_->ExportKey(request, &response);
+ 
+     hidl_vec<uint8_t> resultKeyBlob;
+@@ -483,11 +483,11 @@ int OpteeKeymaster3Device::verifiedBootState(uint8_t *in) {
+ Return<void>  OpteeKeymaster3Device::attestKey(const hidl_vec<uint8_t> &keyToAttest,
+                        const hidl_vec<KeyParameter> &attestParams,
+                        attestKey_cb _hidl_cb) {
+-    AttestKeyRequest request;
++    AttestKeyRequest request(3);
+     request.SetKeyMaterial(keyToAttest.data(), keyToAttest.size());
+     request.attest_params.Reinitialize(KmParamSet(attestParams));
+ 
+-    AttestKeyResponse response;
++    AttestKeyResponse response(3);
+     impl_->AttestKey(request, &response);
+ 
+     hidl_vec<hidl_vec<uint8_t>> resultCertChain;
+@@ -501,11 +501,11 @@ Return<void>  OpteeKeymaster3Device::attestKey(const hidl_vec<uint8_t> &keyToAtt
+ Return<void>  OpteeKeymaster3Device::upgradeKey(const hidl_vec<uint8_t> &keyBlobToUpgrade,
+                         const hidl_vec<KeyParameter> &upgradeParams,
+                         upgradeKey_cb _hidl_cb) {
+-    UpgradeKeyRequest request;
++    UpgradeKeyRequest request(3);
+     request.SetKeyMaterial(keyBlobToUpgrade.data(), keyBlobToUpgrade.size());
+     request.upgrade_params.Reinitialize(KmParamSet(upgradeParams));
+ 
+-    UpgradeKeyResponse response;
++    UpgradeKeyResponse response(3);
+     impl_->UpgradeKey(request, &response);
+ 
+     if (response.error == KM_ERROR_OK) {
+@@ -517,18 +517,18 @@ Return<void>  OpteeKeymaster3Device::upgradeKey(const hidl_vec<uint8_t> &keyBlob
+ }
+ 
+ Return<ErrorCode>  OpteeKeymaster3Device::deleteKey(const hidl_vec<uint8_t> &keyBlob) {
+-    DeleteKeyRequest request;
++    DeleteKeyRequest request(3);
+     request.SetKeyMaterial(keyBlob.data(), keyBlob.size());
+ 
+-    DeleteKeyResponse response;
++    DeleteKeyResponse response(3);
+     impl_->DeleteKey(request, &response);
+ 
+     return legacy_enum_conversion(response.error);
+ }
+ 
+ Return<ErrorCode> OpteeKeymaster3Device::deleteAllKeys() {
+-    DeleteAllKeysRequest request;
+-    DeleteAllKeysResponse response;
++    DeleteAllKeysRequest request(3);
++    DeleteAllKeysResponse response(3);
+     impl_->DeleteAllKeys(request, &response);
+ 
+     return legacy_enum_conversion(response.error);
+@@ -542,12 +542,12 @@ Return<ErrorCode> OpteeKeymaster3Device::destroyAttestationIds() {
+ 
+ Return<void> OpteeKeymaster3Device::begin(KeyPurpose purpose, const hidl_vec<uint8_t> &key,
+                    const hidl_vec<KeyParameter> &inParams, begin_cb _hidl_cb) {
+-    BeginOperationRequest request;
++    BeginOperationRequest request(3);
+     request.purpose = legacy_enum_conversion(purpose);
+     request.SetKeyMaterial(key.data(), key.size());
+     request.additional_params.Reinitialize(KmParamSet(inParams));
+ 
+-    BeginOperationResponse response;
++    BeginOperationResponse response(3);
+     impl_->BeginOperation(request, &response);
+ 
+     hidl_vec<KeyParameter> resultParams;
+@@ -561,8 +561,8 @@ Return<void> OpteeKeymaster3Device::begin(KeyPurpose purpose, const hidl_vec<uin
+ 
+ Return<void> OpteeKeymaster3Device::update(uint64_t operationHandle, const hidl_vec<KeyParameter> &inParams,
+                     const hidl_vec<uint8_t> &input, update_cb _hidl_cb) {
+-    UpdateOperationRequest request;
+-    UpdateOperationResponse response;
++    UpdateOperationRequest request(3);
++    UpdateOperationResponse response(3);
+     hidl_vec<KeyParameter> resultParams;
+     hidl_vec<uint8_t> resultBlob;
+     uint32_t resultConsumed = 0;
+@@ -596,13 +596,13 @@ Return<void> OpteeKeymaster3Device::update(uint64_t operationHandle, const hidl_
+ Return<void>  OpteeKeymaster3Device::finish(uint64_t operationHandle, const hidl_vec<KeyParameter> &inParams,
+                     const hidl_vec<uint8_t> &input, const hidl_vec<uint8_t> &signature,
+                     finish_cb _hidl_cb) {
+-    FinishOperationRequest request;
++    FinishOperationRequest request(3);
+     request.op_handle = operationHandle;
+     request.input.Reinitialize(input.data(), input.size());
+     request.signature.Reinitialize(signature.data(), signature.size());
+     request.additional_params.Reinitialize(KmParamSet(inParams));
+ 
+-    FinishOperationResponse response;
++    FinishOperationResponse response(3);
+     impl_->FinishOperation(request, &response);
+ 
+     hidl_vec<KeyParameter> resultParams;
+@@ -616,10 +616,10 @@ Return<void>  OpteeKeymaster3Device::finish(uint64_t operationHandle, const hidl
+ }
+ 
+ Return<ErrorCode>  OpteeKeymaster3Device::abort(uint64_t operationHandle) {
+-    AbortOperationRequest request;
++    AbortOperationRequest request(3);
+     request.op_handle = operationHandle;
+ 
+-    AbortOperationResponse response;
++    AbortOperationResponse response(3);
+     impl_->AbortOperation(request, &response);
+ 
+     return legacy_enum_conversion(response.error);
+diff --git a/keymaster/optee_keymaster.cpp b/keymaster/optee_keymaster.cpp
+index f6a1639..79f81bc 100644
+--- a/keymaster/optee_keymaster.cpp
++++ b/keymaster/optee_keymaster.cpp
+@@ -40,11 +40,11 @@ int OpteeKeymaster::Initialize() {
+         return err;
+     }
+ 
+-    ConfigureRequest req;
++    ConfigureRequest req(3);
+     req.os_version = GetOsVersion();
+     req.os_patchlevel = GetOsPatchlevel();
+ 
+-    ConfigureResponse rsp;
++    ConfigureResponse rsp(3);
+     Configure(req, &rsp);
+ 
+     if (rsp.error != KM_ERROR_OK) {
+@@ -184,21 +184,21 @@ void OpteeKeymaster::AbortOperation(const AbortOperationRequest& request,
+ 
+ /* Methods for Keymaster 4.0 functionality -- not yet implemented */
+ GetHmacSharingParametersResponse OpteeKeymaster::GetHmacSharingParameters() {
+-    GetHmacSharingParametersResponse response;
++    GetHmacSharingParametersResponse response(3);
+     response.error = KM_ERROR_UNIMPLEMENTED;
+     return response;
+ }
+ 
+ ComputeSharedHmacResponse OpteeKeymaster::ComputeSharedHmac(
+         const ComputeSharedHmacRequest& /* request */) {
+-    ComputeSharedHmacResponse response;
++    ComputeSharedHmacResponse response(3);
+     response.error = KM_ERROR_UNIMPLEMENTED;
+     return response;
+ }
+ 
+ VerifyAuthorizationResponse OpteeKeymaster::VerifyAuthorization(
+         const VerifyAuthorizationRequest& /* request */) {
+-    VerifyAuthorizationResponse response;
++    VerifyAuthorizationResponse response(3);
+     response.error = KM_ERROR_UNIMPLEMENTED;
+     return response;
+ }
+-- 
+2.17.1
+

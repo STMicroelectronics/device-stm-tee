@@ -1,0 +1,29 @@
+From 3079efb8b5f78ce4d137bef8763deee2ead0b377 Mon Sep 17 00:00:00 2001
+From: Yves COPPEAUX <yves.coppeaux@st.com>
+Date: Tue, 25 Jun 2024 11:51:43 +0200
+Subject: [PATCH 10/12] arm: plat-stm32mp2: set AVB as early TA
+
+---
+ core/arch/arm/plat-stm32mp2/conf.mk | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/core/arch/arm/plat-stm32mp2/conf.mk b/core/arch/arm/plat-stm32mp2/conf.mk
+index dfa3afd57..004c75ece 100644
+--- a/core/arch/arm/plat-stm32mp2/conf.mk
++++ b/core/arch/arm/plat-stm32mp2/conf.mk
+@@ -177,6 +177,12 @@ CFG_IN_TREE_EARLY_TAS += remoteproc/80a4c275-0a47-4905-8285-1486a9771a08
+ RPROC_SIGN_KEY ?= keys/default.pem
+ endif
+ 
++# Enable Early TA for AVB mechanism
++CFG_TA_AVB ?= y
++ifeq ($(CFG_TA_AVB),y)
++CFG_IN_TREE_EARLY_TAS += avb/023f8f1a-292a-432b-8fc4-de8471358067
++endif
++
+ # Default enable HWRNG PTA support
+ CFG_HWRNG_PTA ?= $(CFG_STM32_RNG)
+ ifeq ($(CFG_HWRNG_PTA),y)
+-- 
+2.34.1
+

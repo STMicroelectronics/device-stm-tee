@@ -1,7 +1,7 @@
-From 075b365736552bac851acba968efd6deb4ef475a Mon Sep 17 00:00:00 2001
+From 40331caf5e18877f137c9640c6d344acffea3d63 Mon Sep 17 00:00:00 2001
 From: frq09432 <nicolas.louboutin@st.com>
 Date: Wed, 24 Jun 2020 15:00:54 +0200
-Subject: [PATCH 2/6] keymaster: clean (replace tab by space for indentation)
+Subject: [PATCH 02/11] keymaster: clean (replace tab by space for indentation)
 
 ---
  keymaster/3.0/optee_keymaster3_device.cpp | 94 +++++++++++------------

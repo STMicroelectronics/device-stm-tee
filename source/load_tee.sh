@@ -19,13 +19,13 @@
 #######################################
 # Constants
 #######################################
-SCRIPT_VERSION="1.1"
+SCRIPT_VERSION="1.3"
 
-SOC_FAMILY="stm32mp1"
-SOC_NAME="stm32mp15"
-SOC_VERSIONS=( "stm32mp157c" "stm32mp157f" )
+SOC_FAMILY="stm32mp2"
+SOC_NAME="stm32mp25"
+SOC_VERSIONS=( "stm32mp257f" )
 
-DEFAULT_TEE_VERSION=3.9.0
+DEFAULT_TEE_VERSION=3.19.0
 
 if [ -n "${ANDROID_BUILD_TOP+1}" ]; then
   TOP_PATH=${ANDROID_BUILD_TOP}
@@ -413,7 +413,7 @@ do
         "GIT_PATH" )
           git_path=($(echo $line | awk '{ print $2 }'))
           if [[ ${do_user_load} == 0 ]]; then
-            state "Loading OP-TEE OS source"
+            state "Loading ${config_name} source"
           fi
           if [ -n "${TEE_CACHE_DIR+1}" ]; then
             \git clone -b ${tee_version} --reference ${TEE_CACHE_DIR} ${git_path} ${tee_path}  >/dev/null 2>&1
@@ -440,7 +440,7 @@ do
         "ARCHIVE_PATH" )
           archive_path=($(echo $line | awk '{ print $2 }'))
           if [[ ${do_user_load} == 0 ]]; then
-            state "Loading OP-TEE OS source"
+            state "Loading ${config_name} source"
           fi
           \mkdir -p ${tee_path} >/dev/null 2>&1
           \pushd ${tee_path} >/dev/null 2>&1
@@ -492,7 +492,7 @@ do
   if [[ ${do_user_load} == 0 ]]; then
     echo "${config_name} LOADED" >> ${TEE_OS_CONFIG_STATUS_PATH}
     clear_line
-    green "The tee os has been successfully loaded in ${tee_path}"
+    green "The ${config_name} has been successfully loaded in ${tee_path}"
   else
     echo "${config_name} LOADED" >> ${TEE_USER_CONFIG_STATUS_PATH}
   fi

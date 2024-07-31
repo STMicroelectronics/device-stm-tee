@@ -1,7 +1,7 @@
-From f225fcd574160be721c740a5c746f9e3de000f3a Mon Sep 17 00:00:00 2001
+From 8ab011275759a4261e3a3fed987c568f5d43f58f Mon Sep 17 00:00:00 2001
 From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
 Date: Thu, 6 Aug 2020 16:14:23 +0200
-Subject: [PATCH 6/6] keymaster: ta: remove unused elements (warnings)
+Subject: [PATCH 06/11] keymaster: ta: remove unused elements (warnings)
 
 ---
  keymaster/ta/crypto_ec.c | 2 --

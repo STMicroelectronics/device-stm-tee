@@ -21,13 +21,13 @@
 #######################################
 SCRIPT_VERSION="1.1"
 
-SOC_FAMILY="stm32mp1"
-SOC_NAME="stm32mp15"
-SOC_VERSIONS=( "stm32mp157c" "stm32mp157f" )
+SOC_FAMILY="stm32mp2"
+SOC_NAME="stm32mp25"
+SOC_VERSIONS=( "stm32mp257f" )
 
 # OP-TEE
-TEE_ARCH=arm
-TEE_TOOLCHAIN=gcc-arm-9.2-2019.12-x86_64-arm-none-eabi
+TEE_ARCH=aarch64
+TEE_TOOLCHAIN="13.2.Rel1"
 
 if [ -n "${ANDROID_BUILD_TOP+1}" ]; then
   TOP_PATH=${ANDROID_BUILD_TOP}
@@ -45,8 +45,8 @@ TA_BUILDCONFIG=android_tabuild.config
 TEE_SOURCE_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/source
 TEE_PREBUILT_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/prebuilt
 
-TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/gcc/linux-x86/arm/${TEE_TOOLCHAIN}/bin
-TEE_CROSS_COMPILE=arm-none-eabi-
+TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/arm-gnu-toolchain/arm-gnu-toolchain-${TEE_TOOLCHAIN}-x86_64-aarch64-none-linux-gnu/bin
+TEE_CROSS_COMPILE=aarch64-none-linux-gnu-
 
 TEE_OUT=${TOP_PATH}/out-bsp/${SOC_FAMILY}/TEE_OBJ
 
@@ -305,7 +305,7 @@ generate_ta()
   mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}/ta/${ta_dir}
 
   \make ${verbose} -j8 -C ${ta_src} O=${TEE_OUT}/${soc_version}-${board_flavour}/ta/${ta_dir} \
-    TA_DEV_KIT_DIR=${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32 \
+    TA_DEV_KIT_DIR=${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm64 \
     CROSS_COMPILE=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} &>${redirect_out}
 
   if [ $? -ne 0 ]; then

@@ -19,15 +19,18 @@
 #######################################
 # Constants
 #######################################
-SCRIPT_VERSION="1.3"
+SCRIPT_VERSION="1.6"
 
-SOC_FAMILY="stm32mp1"
-SOC_NAME="stm32mp15"
-SOC_VERSIONS=( "stm32mp157c" "stm32mp157f" )
+SOC_FAMILY="stm32mp2"
+SOC_NAME="stm32mp25"
+SOC_VERSIONS=( "stm32mp257f" )
+
+# Add SOC revision if any (ex: REVA)
+SOC_REV="REVB"
 
 # OP-TEE
 TEE_ARCH=arm
-TEE_TOOLCHAIN=gcc-arm-9.2-2019.12-x86_64-arm-none-eabi
+TEE_TOOLCHAIN="13.2.Rel1"
 
 # OP-TEE is speparated in three parts:
 # header giving information on both pager and pageable parts
@@ -36,7 +39,7 @@ TEE_TOOLCHAIN=gcc-arm-9.2-2019.12-x86_64-arm-none-eabi
 TEE_HEADER="tee-header_v2"
 TEE_PAGEABLE="tee-pageable_v2"
 TEE_PAGER="tee-pager_v2"
-TEE_EXT="stm32"
+TEE_EXT="bin"
 TEE_ELF_EXT="elf"
 
 if [ -n "${ANDROID_BUILD_TOP+1}" ]; then
@@ -55,8 +58,8 @@ TEE_BUILDCONFIG=android_teebuild.config
 TEE_SOURCE_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/source
 TEE_PREBUILT_PATH=${TOP_PATH}/device/stm/${SOC_FAMILY}-tee/prebuilt
 
-TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/gcc/linux-x86/arm/${TEE_TOOLCHAIN}/bin
-TEE_CROSS_COMPILE=arm-none-eabi-
+TEE_CROSS_COMPILE_PATH=${TOP_PATH}/prebuilts/arm-gnu-toolchain/arm-gnu-toolchain-${TEE_TOOLCHAIN}-x86_64-aarch64-none-linux-gnu/bin
+TEE_CROSS_COMPILE=aarch64-none-linux-gnu-
 
 TEE_OUT=${TOP_PATH}/out-bsp/${SOC_FAMILY}/TEE_OBJ
 
@@ -65,14 +68,20 @@ DEFAULT_BOARD_NAME_LIST=( "eval" )
 DEFAULT_BOARD_FLAVOUR_LIST=( "ev1" )
 
 # Debug available levels
-TEE_DEBUG_0="CFG_TEE_CORE_DEBUG=n"
+TEE_DEBUG_0="CFG_TEE_CORE_DEBUG=n CFG_TEE_TA_LOG_LEVEL=0"
+TEE_DEBUG_1="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=1 CFG_TEE_TA_LOG_LEVEL=1"
 TEE_DEBUG_2="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=2 CFG_TEE_TA_LOG_LEVEL=2"
 TEE_DEBUG_3="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=3 CFG_TEE_TA_LOG_LEVEL=3"
+TEE_DEBUG_4="CFG_TEE_CORE_DEBUG=y CFG_TEE_CORE_LOG_LEVEL=4 CFG_TEE_TA_LOG_LEVEL=4"
 
 # RPMB base configuration
 TEE_RPMB_CONFIG="CFG_RPMB_FS=y CFG_RPMB_FS_DEV_ID=1 CFG_RPMB_TESTKEY=y "
 # TAKE CARE: write key used to provision RPMB key (fuse), no possibility to come back.
 TEE_RPMB_CONFIG+="CFG_RPMB_WRITE_KEY=y "
+
+if [[ ${SOC_REV} == "REVA" ]]; then
+TEE_RPMB_CONFIG+="CFG_STM32MP25x_REVA=y "
+fi
 
 # Used to reset RPMB (must be performed only once, reboot is not possible with this configuration)
 # TEE_RPMB_CONFIG+="CFG_RPMB_RESET_FAT=y "
@@ -94,13 +103,17 @@ nb_states=0
 do_install=0
 do_onlyclean=0
 
+do_debug=0
+
 verbose="--quiet"
 verbose_level=0
 
 tee_debug=${TEE_DEBUG_0}
 tee_config=""
-enable_rpmb=0
-rpmb_level=0
+
+# By default built for RPMB key storage
+enable_rpmb=1
+rpmb_level=2
 
 # By default redirect stdout and stderr to /dev/null
 redirect_out="/dev/null"
@@ -144,18 +157,20 @@ usage()
   echo "  -h / --help: print this message"
   echo "  -i / --install: update prebuilt images"
   echo "  -r <level> / --rpmb=<level>:"
-  echo "      0: disable RPMB (default)"
+  echo "      0: disable RPMB"
   echo "      1: enable RPMB with TESTKEY for anti-rollback only (TAKE CARE: CFG_RPMB_WRITE_KEY is enabled, fusing the TESTKEY on your device)"
-  echo "      2: enable RPMB with TESTKEY for secure storage (TAKE CARE: CFG_RPMB_WRITE_KEY is enabled, fusing the TESTKEY on your device)"
+  echo "      2: enable RPMB with TESTKEY for secure storage (TAKE CARE: CFG_RPMB_WRITE_KEY is enabled, fusing the TESTKEY on your device)  (default)"
   echo "  -v / --version: get script version"
   echo "  --verbose=<level>: enable build verbosity"
   echo "      0: no verbosity (default)"
   echo "      1: remove script filtering"
   echo "      2: remove script filtering and quiet option for the build"
   echo "  -d <level> / --debug=<level>: TEE debug level"
-  echo "      0: no debug (default)"
-  echo "      1: TEE core and TA log level 2"
-  echo "      2: TEE core and TA log level 3"
+  echo "      0: NO DEBUG (default)"
+  echo "      1: TEE core and TA log level 1 = Only non-tagged and error trace (MSG/EMSG)"
+  echo "      2: TEE core and TA log level 2 = + Info trace messages (IMSG)"
+  echo "      3: TEE core and TA log level 3 = + Debug trace messages (DMSG)"
+  echo "      4: TEE core and TA log level 4 = + Flow trace messages (FMSG)"
   echo "  -b <name> / --board=<name>: set board name from following list = ${DEFAULT_BOARD_NAME_LIST[*]} (default: all)"
   empty_line
   echo "Command: Optional, only one command at a time supported"
@@ -231,6 +246,22 @@ green()
 clear_line()
 {
   echo -ne "\033[2K"
+}
+
+#######################################
+# Print debug message in green
+# Globals:
+#   None
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+debug()
+{
+  if [[ ${do_debug} == 1 ]]; then
+    echo "$(tput setaf 2)DEBUG: $1$(tput sgr0)"
+  fi
 }
 
 #######################################
@@ -376,8 +407,16 @@ extract_buildconfig()
 #######################################
 generate_tee()
 {
-  \make ${verbose} -j8 -C ${tee_src} O=${TEE_OUT}/${soc_version}-${board_flavour} \
-    ARCH="${TEE_ARCH}" CROSS_COMPILE=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
+
+  debug "make ${verbose} -j8 -C ${tee_src} O=${TEE_OUT}/${soc_version}-${board_flavour} ARCH="${TEE_ARCH}" \
+    CROSS_COMPILE_core=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
+    CROSS_COMPILE_ta_arm64=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
+    ${tee_debug} ${tee_config} PLATFORM=${SOC_FAMILY} \
+    CFG_EMBED_DTB_SOURCE_FILE=${tee_dtb}.dts $1"
+
+  \make ${verbose} -j8 -C ${tee_src} O=${TEE_OUT}/${soc_version}-${board_flavour} ARCH="${TEE_ARCH}" \
+    CROSS_COMPILE_core=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
+    CROSS_COMPILE_ta_arm64=${TEE_CROSS_COMPILE_PATH}/${TEE_CROSS_COMPILE} \
     ${tee_debug} ${tee_config} PLATFORM=${SOC_FAMILY} \
     CFG_EMBED_DTB_SOURCE_FILE=${tee_dtb}.dts $1 &>${redirect_out}
 
@@ -411,16 +450,21 @@ install_tee()
   if [ ! -d "${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}" ]; then
     \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}
     \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os
-    \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32
+    \mkdir -p ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm64
   fi
 
   \rm -rf ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/*
-  \rm -rf ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32/*
+  \rm -rf ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm64/*
 
+  debug "cp $(find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_HEADER}.${TEE_EXT}" -print0 | tr '\0' '\n') ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_HEADER}-${soc_version}-${board_flavour}.${TEE_EXT}"
   \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_HEADER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_HEADER}-${soc_version}-${board_flavour}.${TEE_EXT}
+  debug "cp $(find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGEABLE}.${TEE_EXT}" -print0 | tr '\0' '\n') ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGEABLE}-${soc_version}-${board_flavour}.${TEE_EXT}"
   \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGEABLE}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGEABLE}-${soc_version}-${board_flavour}.${TEE_EXT}
+  debug "cp $(find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGER}.${TEE_EXT}" -print0 | tr '\0' '\n') ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGER}-${soc_version}-${board_flavour}.${TEE_EXT}"
   \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "${TEE_PAGER}.${TEE_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/${TEE_PAGER}-${soc_version}-${board_flavour}.${TEE_EXT}
-  \cp -rf ${TEE_OUT}/${soc_version}-${board_flavour}/export-ta_arm32/* ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm32/
+  debug "cp -rf ${TEE_OUT}/${soc_version}-${board_flavour}/export-ta_arm64/* ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm64/"
+  \cp -rf ${TEE_OUT}/${soc_version}-${board_flavour}/export-ta_arm64/* ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/export-ta_arm64/
+  debug "cp $(find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "tee.${TEE_ELF_EXT}" -print0 | tr '\0' '\n') ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/tee-${soc_version}-${board_flavour}.${TEE_ELF_EXT}"
   \find ${TEE_OUT}/${soc_version}-${board_flavour}/ -name "tee.${TEE_ELF_EXT}" -print0 | xargs -0 -I {} cp {} ${TEE_PREBUILT_PATH}/${soc_version}-${board_flavour}/optee_os/tee-${soc_version}-${board_flavour}.${TEE_ELF_EXT}
 }
 
@@ -470,7 +514,7 @@ while getopts "hvir:d:b:-:" option; do
           ;;
         verbose=*)
           verbose_level=${OPTARG#*=}
-          if ! in_list "0 1 2" "${verbose_level}"; then
+          if ! in_list "0 1 2 3" "${verbose_level}"; then
             error "unknown verbose level ${verbose_level}"
             \popd >/dev/null 2>&1
             exit 1
@@ -481,6 +525,9 @@ while getopts "hvir:d:b:-:" option; do
           if [ ${verbose_level} == 2 ];then
             verbose=
           fi
+          if [ ${verbose_level} == 3 ];then
+            verbose="V=1"
+          fi
           ;;
         debug=*)
           debug_arg=${OPTARG#*=}
@@ -489,10 +536,16 @@ while getopts "hvir:d:b:-:" option; do
             tee_debug=${TEE_DEBUG_0}
             ;;
             "1" )
-            tee_debug=${TEE_DEBUG_2}
+            tee_debug=${TEE_DEBUG_1}
             ;;
             "2" )
+            tee_debug=${TEE_DEBUG_2}
+            ;;
+            "3" )
             tee_debug=${TEE_DEBUG_3}
+            ;;
+            "4" )
+            tee_debug=${TEE_DEBUG_4}
             ;;
             ** )
               error "unknown debug level ${debug_arg}"
@@ -547,10 +600,16 @@ while getopts "hvir:d:b:-:" option; do
         tee_debug=${TEE_DEBUG_0}
         ;;
         "1" )
-        tee_debug=${TEE_DEBUG_2}
+        tee_debug=${TEE_DEBUG_1}
         ;;
         "2" )
+        tee_debug=${TEE_DEBUG_2}
+        ;;
+        "3" )
         tee_debug=${TEE_DEBUG_3}
+        ;;
+        "4" )
+        tee_debug=${TEE_DEBUG_4}
         ;;
         ** )
           error "unknown debug level ${OPTARG}"
@@ -636,20 +695,22 @@ do
     \mkdir -p ${TEE_OUT}/${soc_version}-${board_flavour}
 
     # Set TEE DTB name used
-    tee_dtb=${soc_version}-${board_flavour}
+    if [[ ${SOC_REV} == "REVA" ]]; then
+      tee_dtb=${soc_version}-${board_flavour}-revB
+    else
+      tee_dtb=${soc_version}-${board_flavour}
+    fi
 
     # Set TEE config depending on board capability
-    tee_config=""
-    if [ ${board_name} == "eval" ]; then
-      case ${rpmb_level} in
-        "1" )
-        tee_config=${TEE_RPMB_CONFIG_1}
+    tee_config="CFG_ARM64_core=y"
+    case ${rpmb_level} in
+      "1" )
+        tee_config+=" ${TEE_RPMB_CONFIG_1}"
         ;;
-        "2" )
-        tee_config=${TEE_RPMB_CONFIG_2}
+      "2" )
+        tee_config+=" ${TEE_RPMB_CONFIG_2}"
         ;;
-      esac
-    fi
+    esac
 
     if [ ${do_onlyclean} == 1 ]; then
       state "Clean out directory for ${soc_version}-${board_flavour} board"
@@ -668,12 +729,17 @@ do
   done
 done
 
+if [ ${do_onlyclean} == 1 ]; then
+  popd >/dev/null 2>&1
+  exit 0
+fi
+
 if [ ${enable_rpmb} == 1 ]; then
   empty_line
   blue "  RPMB has been enabled with ${tee_config}"
   empty_line
   blue "  It's recommended to disable de RPMB emulator in the tee-supplicant:"
-  blue "    Set \"RPMB_EMU := 0\" in device/stm/stm32mp1/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
+  blue "    Set \"RPMB_EMU := 0\" in device/stm/stm32mp2/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
   empty_line
   blue "  Reminder: the RPMB key (TESTKEY) will be definitively provisioned (fuse) on the device, if not already performed"
 else
@@ -681,7 +747,7 @@ else
   blue "  RPMB has been disabled"
   empty_line
   blue "  It's recommended to enable de RPMB emulator in the tee-supplicant:"
-  blue "    Set \"RPMB_EMU := 1\" in device/stm/stm32mp1/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
+  blue "    Set \"RPMB_EMU := 1\" in device/stm/stm32mp2/tee/optee_client/tee-supplicant/tee_supplicant_android.mk"
 fi
 
 popd >/dev/null 2>&1

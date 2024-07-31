@@ -1,0 +1,111 @@
+From 195e8d830790a7cee652d9d520e490ffd0a33775 Mon Sep 17 00:00:00 2001
+From: Igor Opaniuk <igor.opaniuk@linaro.org>
+Date: Tue, 19 Jun 2018 09:15:12 +0300
+Subject: [PATCH 04/12] libtomcrypt: rsa: oaep: Use SHA-1 by default for MGF1
+
+Android BoringSSL uses SHA1 as default hash function for MGF1 mask
+generating function, in case if hash function isn't explicitly
+specified [1].
+This patch introduces similar behaviour to libtomcrypto.
+
+To pass all Keymaster VTS tests libtomcrypt and BoringSSL should follow the
+same behaviour.
+
+[1]: https://github.com/google/boringssl/blob/master/include/openssl/rsa.h#L441
+
+Signed-off-by: Igor Opaniuk <igor.opaniuk@linaro.org>
+---
+ .../libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c    | 12 +++++++++---
+ .../libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_encode.c    | 11 ++++++++---
+ 2 files changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c b/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c
+index 5bb3918e1..333021183 100644
+--- a/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c
++++ b/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_decode.c
+@@ -30,7 +30,7 @@ int pkcs_1_oaep_decode(const unsigned char *msg,    unsigned long msglen,
+ {
+    unsigned char *DB, *seed, *mask;
+    unsigned long hLen, x, y, modulus_len;
+-   int           err, ret;
++   int           err, ret, mgf1_hash;
+ 
+    LTC_ARGCHK(msg    != NULL);
+    LTC_ARGCHK(out    != NULL);
+@@ -44,6 +44,12 @@ int pkcs_1_oaep_decode(const unsigned char *msg,    unsigned long msglen,
+    if ((err = hash_is_valid(hash_idx)) != CRYPT_OK) {
+       return err;
+    }
++
++   mgf1_hash = find_hash("sha1");
++   if ((err = hash_is_valid(mgf1_hash)) != CRYPT_OK) {
++      return err;
++   }
++
+    hLen        = hash_descriptor[hash_idx]->hashsize;
+    modulus_len = (modulus_bitlen >> 3) + (modulus_bitlen & 7 ? 1 : 0);
+ 
+@@ -94,7 +100,7 @@ int pkcs_1_oaep_decode(const unsigned char *msg,    unsigned long msglen,
+    x += modulus_len - hLen - 1;
+ 
+    /* compute MGF1 of maskedDB (hLen) */
+-   if ((err = pkcs_1_mgf1(hash_idx, DB, modulus_len - hLen - 1, mask, hLen)) != CRYPT_OK) {
++   if ((err = pkcs_1_mgf1(mgf1_hash, DB, modulus_len - hLen - 1, mask, hLen)) != CRYPT_OK) {
+       goto LBL_ERR;
+    }
+ 
+@@ -104,7 +110,7 @@ int pkcs_1_oaep_decode(const unsigned char *msg,    unsigned long msglen,
+    }
+ 
+    /* compute MGF1 of seed (k - hlen - 1) */
+-   if ((err = pkcs_1_mgf1(hash_idx, seed, hLen, mask, modulus_len - hLen - 1)) != CRYPT_OK) {
++   if ((err = pkcs_1_mgf1(mgf1_hash, seed, hLen, mask, modulus_len - hLen - 1)) != CRYPT_OK) {
+       goto LBL_ERR;
+    }
+ 
+diff --git a/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_encode.c b/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_encode.c
+index 93ee1db27..c6272843a 100644
+--- a/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_encode.c
++++ b/core/lib/libtomcrypt/src/pk/pkcs1/pkcs_1_oaep_encode.c
+@@ -31,7 +31,7 @@ int pkcs_1_oaep_encode(const unsigned char *msg,    unsigned long msglen,
+ {
+    unsigned char *DB, *seed, *mask;
+    unsigned long hLen, x, y, modulus_len;
+-   int           err;
++   int           err, mgf1_hash;
+ 
+    LTC_ARGCHK(msg    != NULL);
+    LTC_ARGCHK(out    != NULL);
+@@ -47,6 +47,11 @@ int pkcs_1_oaep_encode(const unsigned char *msg,    unsigned long msglen,
+       return err;
+    }
+ 
++   mgf1_hash = find_hash("sha1");
++   if ((err = hash_is_valid(mgf1_hash)) != CRYPT_OK) {
++      return err;
++   }
++
+    hLen        = hash_descriptor[hash_idx]->hashsize;
+    modulus_len = (modulus_bitlen >> 3) + (modulus_bitlen & 7 ? 1 : 0);
+ 
+@@ -106,7 +111,7 @@ int pkcs_1_oaep_encode(const unsigned char *msg,    unsigned long msglen,
+    }
+ 
+    /* compute MGF1 of seed (k - hlen - 1) */
+-   if ((err = pkcs_1_mgf1(hash_idx, seed, hLen, mask, modulus_len - hLen - 1)) != CRYPT_OK) {
++   if ((err = pkcs_1_mgf1(mgf1_hash, seed, hLen, mask, modulus_len - hLen - 1)) != CRYPT_OK) {
+       goto LBL_ERR;
+    }
+ 
+@@ -116,7 +121,7 @@ int pkcs_1_oaep_encode(const unsigned char *msg,    unsigned long msglen,
+    }
+ 
+    /* compute MGF1 of maskedDB (hLen) */
+-   if ((err = pkcs_1_mgf1(hash_idx, DB, modulus_len - hLen - 1, mask, hLen)) != CRYPT_OK) {
++   if ((err = pkcs_1_mgf1(mgf1_hash, DB, modulus_len - hLen - 1, mask, hLen)) != CRYPT_OK) {
+       goto LBL_ERR;
+    }
+ 
+-- 
+2.34.1
+

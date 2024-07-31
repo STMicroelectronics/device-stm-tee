@@ -14,4 +14,4 @@
 # limitations under the License.
 #
 
-TA_DEV_KIT_DIR=device/stm/stm32mp1-tee/prebuilt/$(SOC_VERSION)-$(BOARD_FLAVOUR)/export-ta_arm32
+TA_DEV_KIT_DIR=device/stm/stm32mp2-tee/prebuilt/$(SOC_VERSION)-$(BOARD_FLAVOUR)/export-ta_arm64

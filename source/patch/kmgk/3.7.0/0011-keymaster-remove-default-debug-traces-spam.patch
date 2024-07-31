@@ -1,0 +1,259 @@
+From 93a1299da915bc4a1ce43086bfe66f3d8fbbc7f0 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Tue, 8 Aug 2023 18:21:22 +0200
+Subject: [PATCH 11/11] [keymaster] remove default debug traces (spam)
+
+Prefer verbose option with LOG_NDEBUG parameter to enable the traces if required
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ keymaster/3.0/optee_keymaster3_device.cpp | 67 ++++++++++++-----------
+ keymaster/ipc/optee_keymaster_ipc.cpp     |  3 +-
+ 2 files changed, 36 insertions(+), 34 deletions(-)
+
+diff --git a/keymaster/3.0/optee_keymaster3_device.cpp b/keymaster/3.0/optee_keymaster3_device.cpp
+index f1c1172..779c6c2 100644
+--- a/keymaster/3.0/optee_keymaster3_device.cpp
++++ b/keymaster/3.0/optee_keymaster3_device.cpp
+@@ -27,6 +27,7 @@
+ 
+ #undef LOG_TAG
+ #define LOG_TAG "OpteeKeymaster_cpp"
++// #define LOG_NDEBUG 0
+ 
+ using ::keymaster::AbortOperationRequest;
+ using ::keymaster::AbortOperationResponse;
+@@ -54,7 +55,7 @@ using ::keymaster::ng::Tag;
+ namespace keymaster {
+ 
+ static inline keymaster_tag_type_t typeFromTag(const keymaster_tag_t tag) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return keymaster_tag_get_type(tag);
+ }
+ 
+@@ -65,27 +66,27 @@ static inline keymaster_tag_type_t typeFromTag(const keymaster_tag_t tag) {
+  *      single point of truth. Then this cast function can go away.
+  */
+ inline static keymaster_tag_t legacy_enum_conversion(const Tag value) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return keymaster_tag_t(value);
+ }
+ 
+ inline static Tag legacy_enum_conversion(const keymaster_tag_t value) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return Tag(value);
+ }
+ 
+ inline static keymaster_purpose_t legacy_enum_conversion(const KeyPurpose value) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return keymaster_purpose_t(value);
+ }
+ 
+ inline static keymaster_key_format_t legacy_enum_conversion(const KeyFormat value) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return keymaster_key_format_t(value);
+ }
+ 
+ inline static ErrorCode legacy_enum_conversion(const keymaster_error_t value) {
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return ErrorCode(value);
+ }
+ 
+@@ -95,7 +96,7 @@ inline static ErrorCode legacy_enum_conversion(const keymaster_error_t value) {
+ class KmParamSet : public keymaster_key_param_set_t {
+   public:
+     KmParamSet(const hidl_vec<KeyParameter> &keyParams) {
+-        ALOGD("%s %d", __func__, __LINE__);
++        ALOGV("%s %d", __func__, __LINE__);
+         params = new keymaster_key_param_t[keyParams.size()];
+         length = keyParams.size();
+         for (size_t i = 0; i < keyParams.size(); ++i) {
+@@ -138,7 +139,7 @@ class KmParamSet : public keymaster_key_param_set_t {
+ 
+     KmParamSet(KmParamSet&& other) noexcept
+         : keymaster_key_param_set_t{other.params, other.length} {
+-        ALOGD("%s %d", __func__, __LINE__);
++        ALOGV("%s %d", __func__, __LINE__);
+         other.length = 0;
+         other.params = nullptr;
+     }
+@@ -149,14 +150,14 @@ class KmParamSet : public keymaster_key_param_set_t {
+ 
+ inline static hidl_vec<uint8_t> kmBlob2hidlVec(const keymaster_key_blob_t &blob) {
+     hidl_vec<uint8_t> result;
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     result.setToExternal(const_cast<unsigned char *>(blob.key_material), blob.key_material_size);
+     return result;
+ }
+ 
+ inline static hidl_vec<uint8_t> kmBlob2hidlVec(const keymaster_blob_t &blob) {
+     hidl_vec<uint8_t> result;
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     result.setToExternal(const_cast<unsigned char *>(blob.data), blob.data_length);
+     return result;
+ }
+@@ -170,7 +171,7 @@ inline hidl_vec<uint8_t> kmBuffer2hidlVec(const ::keymaster::Buffer& buf) {
+ inline static hidl_vec<hidl_vec<uint8_t>> kmCertChain2Hidl(
+                 const keymaster_cert_chain_t *cert_chain) {
+     hidl_vec<hidl_vec<uint8_t>> result;
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     if (!cert_chain || cert_chain->entry_count == 0 || !cert_chain->entries)
+         return result;
+ 
+@@ -186,7 +187,7 @@ inline static hidl_vec<hidl_vec<uint8_t>> kmCertChain2Hidl(
+ 
+ static inline hidl_vec<KeyParameter> kmParamSet2Hidl(const keymaster_key_param_set_t& set) {
+     hidl_vec<KeyParameter> result;
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     if (set.length == 0 || set.params == nullptr) return result;
+ 
+     result.resize(set.length);
+@@ -247,7 +248,7 @@ OpteeKeymaster3Device::~OpteeKeymaster3Device() {}
+ 
+ Return<void>  OpteeKeymaster3Device::getHardwareFeatures(getHardwareFeatures_cb _hidl_cb) {
+     //send results off to the client
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     _hidl_cb(true /* is_secure */, true /* supports_ec */,
+              true /* supports_symmetric_cryptography */, true /* supports_attestation */,
+              true /* supportsAllDigests */, "OP-TEE Keymaster HALv3_0", "OP-TEE Foundation");
+@@ -284,19 +285,19 @@ int OpteeKeymaster3Device::osVersion(uint32_t *in) {
+      * return (major * 100 + minor) * 100 + subminor;
+      * = major * 10000 + minor * 100 + subminor
+      */
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     if (property_get("ro.build.version.release", value, "") <= 0) {
+         ALOGE("Error get property ro.build.version.release");
+         goto exit;
+     }
+-    ALOGD("%s %d ro.build.version.release value = %s", __func__, __LINE__, value); //8.1.0 or Q
++    ALOGV("%s %d ro.build.version.release value = %s", __func__, __LINE__, value); //8.1.0 or Q
+ 
+     *in = (uint32_t) std::atoi(str) * 10000;
+-    ALOGD("%s %d *in = %u", __func__, __LINE__, *in); //80000 or 0
++    ALOGV("%s %d *in = %u", __func__, __LINE__, *in); //80000 or 0
+     if (str)
+-        ALOGD("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //8.1.0 or Q
++        ALOGV("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //8.1.0 or Q
+     else
+-        ALOGD("%s %d str is null", __func__, __LINE__);
++        ALOGV("%s %d str is null", __func__, __LINE__);
+ 
+     /**
+      * master branch returns an uppercase alphabet instead of a proper
+@@ -304,9 +305,9 @@ int OpteeKeymaster3Device::osVersion(uint32_t *in) {
+      * minor and subminor ignored
+      */
+     if (*value > 70 && *value < 91) {
+-        ALOGD("Convert %s to corresponding version number", value);
++        ALOGV("Convert %s to corresponding version number", value);
+         *in = (uint32_t) (*value - 71) * 10000;
+-        ALOGD("%s %d *in = %u", __func__, __LINE__, *in);
++        ALOGV("%s %d *in = %u", __func__, __LINE__, *in);
+         goto exit;
+     }
+ 
+@@ -318,11 +319,11 @@ int OpteeKeymaster3Device::osVersion(uint32_t *in) {
+     if (std::strchr(str, '.') != NULL) {
+         str = std::strchr(str, '.');
+         *in += (uint32_t) std::atoi(str + 1) * 100;
+-        ALOGD("%s %d *in = %u", __func__, __LINE__, *in); //80100
++        ALOGV("%s %d *in = %u", __func__, __LINE__, *in); //80100
+         if (str)
+-            ALOGD("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.1.0
++            ALOGV("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.1.0
+         else
+-            ALOGD("%s %d str is null", __func__, __LINE__);
++            ALOGV("%s %d str is null", __func__, __LINE__);
+     }
+ 
+     /*
+@@ -334,19 +335,19 @@ int OpteeKeymaster3Device::osVersion(uint32_t *in) {
+     if (std::strchr(str + 1, '.') != NULL) {
+         str = std::strchr(str + 1, '.');
+         *in += (uint32_t) std::atoi(str + 1);
+-        ALOGD("%s %d *in = %u", __func__, __LINE__, *in); //80100
++        ALOGV("%s %d *in = %u", __func__, __LINE__, *in); //80100
+         if (str)
+-            ALOGD("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.0
++            ALOGV("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.0
+         else
+-            ALOGD("%s %d str is null", __func__, __LINE__);
++            ALOGV("%s %d str is null", __func__, __LINE__);
+     }
+ 
+-    ALOGD("%s %d ro.build.version.release value = %s", __func__, __LINE__, value); //8.1.0
+-    ALOGD("%s %d *in = %u", __func__, __LINE__, *in); //80100
++    ALOGV("%s %d ro.build.version.release value = %s", __func__, __LINE__, value); //8.1.0
++    ALOGV("%s %d *in = %u", __func__, __LINE__, *in); //80100
+     if (str)
+-        ALOGD("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.0
++        ALOGV("%s %d ro.build.version.release str = %s", __func__, __LINE__, str); //.0
+     else
+-        ALOGD("%s %d str is null", __func__, __LINE__);
++        ALOGV("%s %d str is null", __func__, __LINE__);
+ exit:
+     return sizeof(*in);
+ }
+@@ -355,7 +356,7 @@ int OpteeKeymaster3Device::osPatchlevel(uint32_t *in) {
+     char value[PROPERTY_VALUE_MAX] = {0,};
+     char *str = value;
+ 
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     if (property_get("ro.build.version.security_patch", value, "") <= 0) {
+         ALOGE("Error get property ro.build.version.security_patch");
+         *in = 0xFFFFFFFF;
+@@ -461,7 +462,7 @@ Return<void>  OpteeKeymaster3Device::exportKey(KeyFormat exportFormat,
+ int OpteeKeymaster3Device::verifiedBootState(uint8_t *in) {
+     char value[PROPERTY_VALUE_MAX] = {0,};
+ 
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     if (property_get("ro.boot.verifiedbootstate", value, "") > 0) {
+         if (value[0] == 'g') {
+             *in = (uint8_t) 0x0;
+@@ -536,7 +537,7 @@ Return<ErrorCode> OpteeKeymaster3Device::deleteAllKeys() {
+ 
+ Return<ErrorCode> OpteeKeymaster3Device::destroyAttestationIds() {
+     //ErrorCode rc = ErrorCode::OK;
+-    ALOGD("%s %d", __func__, __LINE__);
++    ALOGV("%s %d", __func__, __LINE__);
+     return ErrorCode::UNIMPLEMENTED;
+ }
+ 
+diff --git a/keymaster/ipc/optee_keymaster_ipc.cpp b/keymaster/ipc/optee_keymaster_ipc.cpp
+index d2b8648..0721f94 100644
+--- a/keymaster/ipc/optee_keymaster_ipc.cpp
++++ b/keymaster/ipc/optee_keymaster_ipc.cpp
+@@ -27,6 +27,7 @@
+ 
+ #undef LOG_TAG
+ #define LOG_TAG "OpteeKeymaster_ipc"
++// #define LOG_NDEBUG 0
+ 
+ static TEEC_Context ctx;
+ static TEEC_Session sess;
+@@ -201,7 +202,7 @@ keymaster_error_t optee_keymaster_call(uint32_t cmd, const keymaster::Serializab
+     uint32_t res;
+     uint32_t err_origin;
+ 
+-    ALOGD("%s %d %u\n", __func__, __LINE__, cmd);
++    ALOGV("%s %d %u\n", __func__, __LINE__, cmd);
+     if (!connected) {
+         ALOGE("Keystore trusted application is not connected");
+         return KM_ERROR_SECURE_HW_COMMUNICATION_FAILED;
+-- 
+2.17.1
+

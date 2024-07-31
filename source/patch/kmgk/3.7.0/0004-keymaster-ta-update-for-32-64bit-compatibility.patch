@@ -1,7 +1,7 @@
-From f5095b421bd41cba6f89e3ef483cbeea5827d95e Mon Sep 17 00:00:00 2001
+From 764450ccef2d625a414a1cf5e9a8fdf68da44a8f Mon Sep 17 00:00:00 2001
 From: frq09432 <nicolas.louboutin@st.com>
 Date: Wed, 24 Jun 2020 15:03:56 +0200
-Subject: [PATCH 4/6] keymaster: ta: update for 32/64bit compatibility
+Subject: [PATCH 04/11] keymaster: ta: update for 32/64bit compatibility
 
 ---
  keymaster/ta/crypto_rsa.c            |  2 +-

@@ -1,0 +1,27 @@
+From 3b9c29ac8ae82ff780af6176f37f2778d7f7bb99 Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Tue, 28 Nov 2023 11:42:02 +0100
+Subject: [PATCH 12/12] dts: change fastboot to bootloader reboot mode used in
+ Android
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ core/arch/arm/dts/stm32mp251.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/core/arch/arm/dts/stm32mp251.dtsi b/core/arch/arm/dts/stm32mp251.dtsi
+index 548fbce4c..6f92287f6 100644
+--- a/core/arch/arm/dts/stm32mp251.dtsi
++++ b/core/arch/arm/dts/stm32mp251.dtsi
+@@ -1081,7 +1081,7 @@
+ 				nvmem-cells = <&boot_mode>;
+ 				nvmem-cell-names = "reboot-mode";
+ 				mode-normal = <0x00>;
+-				mode-fastboot = <0x01>;
++				mode-bootloader = <0x01>;
+ 				mode-recovery = <0x02>;
+ 				mode-stm32cubeprogrammer = <0x03>;
+ 				mode-ums_mmc0 = <0x10>;
+-- 
+2.34.1
+

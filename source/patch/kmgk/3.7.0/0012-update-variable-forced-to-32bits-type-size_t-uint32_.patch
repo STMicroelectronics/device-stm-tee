@@ -1,0 +1,62 @@
+From 54e77f6ee976a17ec569918c878b3509835cea87 Mon Sep 17 00:00:00 2001
+From: Yves COPPEAUX <yves.coppeaux@st.com>
+Date: Thu, 15 Feb 2024 14:05:11 +0100
+Subject: [PATCH] update : variable forced to 32bits, type size_t => uint32_t
+ Tested with VtsHalKeymasterV3_0TargetTest
+
+---
+ keymaster/ta/attestation.c | 10 +++++-----
+ keymaster/ta/generator.c   |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/keymaster/ta/attestation.c b/keymaster/ta/attestation.c
+index cd0916d..f240a3d 100644
+--- a/keymaster/ta/attestation.c
++++ b/keymaster/ta/attestation.c
+@@ -879,7 +879,7 @@ TEE_Result TA_read_attest_cert(TEE_ObjectHandle attObj,
+ 	uint32_t actual_read = 0;
+ 	uint8_t* pBuf = NULL;
+ 	size_t nEntryCount = 1; // KEY_ATT_CERT_INDEX used for key attestation
+-	size_t nCertLen = 0;
++	uint32_t nCertLen = 0;
+ 
+ 	if (cert_chain == NULL)
+ 		return TEE_ERROR_BAD_PARAMETERS;
+@@ -899,8 +899,8 @@ TEE_Result TA_read_attest_cert(TEE_ObjectHandle attObj,
+ 	//Read root certificate, index[n], length
+ 	while (info.dataPosition != info.dataSize)
+ 	{
+-		res = TEE_ReadObjectData(attObj, &nCertLen, sizeof(size_t), &actual_read);
+-		if (res != TEE_SUCCESS || actual_read != sizeof(size_t)) {
++		res = TEE_ReadObjectData(attObj, &nCertLen, sizeof(uint32_t), &actual_read);
++				if (res != TEE_SUCCESS || actual_read != sizeof(uint32_t)) {
+ 			EMSG("Failed to read root certificate length, res=%x", res);
+ 			return res;
+ 		}
+@@ -941,8 +941,8 @@ TEE_Result TA_read_attest_cert(TEE_ObjectHandle attObj,
+ 	//Read root certificate, index[n], length
+ 	while (info.dataPosition != info.dataSize)
+ 	{
+-		res = TEE_ReadObjectData(attObj, &nCertLen, sizeof(size_t), &actual_read);
+-		if (res != TEE_SUCCESS || actual_read != sizeof(size_t)) {
++		res = TEE_ReadObjectData(attObj, &nCertLen, sizeof(uint32_t), &actual_read);
++				if (res != TEE_SUCCESS || actual_read != sizeof(uint32_t)) {
+ 			EMSG("Failed to read root certificate length, res=%x", res);
+ 			goto error;
+ 		}
+diff --git a/keymaster/ta/generator.c b/keymaster/ta/generator.c
+index a98d0c1..f71cc0b 100644
+--- a/keymaster/ta/generator.c
++++ b/keymaster/ta/generator.c
+@@ -1023,7 +1023,7 @@ keymaster_error_t TA_create_operation(TEE_OperationHandle *operation,
+ 		} else {
+ 			TEE_CipherInit(*operation,
+ 					nonce.data,
+-					nonce.data_length);
++					(uint32_t) nonce.data_length);
+ 		}
+ 		break;
+ 	case (KM_ALGORITHM_RSA):
+-- 
+2.34.1
+

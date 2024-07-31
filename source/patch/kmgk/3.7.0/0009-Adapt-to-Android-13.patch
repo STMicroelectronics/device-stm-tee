@@ -1,0 +1,26 @@
+From a9fe0b29cd16b3311ab0ed7e8bdd70745867fdea Mon Sep 17 00:00:00 2001
+From: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+Date: Thu, 28 Jul 2022 17:06:54 +0200
+Subject: [PATCH 09/11] Adapt to Android 13
+
+Signed-off-by: Nicolas LOUBOUTIN <nicolas.louboutin@st.com>
+---
+ keymaster/3.0/optee_keymaster3_device.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/keymaster/3.0/optee_keymaster3_device.cpp b/keymaster/3.0/optee_keymaster3_device.cpp
+index 8694c7b..f1c1172 100644
+--- a/keymaster/3.0/optee_keymaster3_device.cpp
++++ b/keymaster/3.0/optee_keymaster3_device.cpp
+@@ -20,7 +20,7 @@
+ #include <memory>
+ #include <new>
+ 
+-#include <authorization_set.h>
++#include <keymaster_tags.h>
+ #include <keymaster/android_keymaster_messages.h>
+ #include <optee_keymaster/optee_keymaster3_device.h>
+ #include <optee_keymaster/ipc/optee_keymaster_ipc.h>
+-- 
+2.17.1
+
