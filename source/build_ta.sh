@@ -51,8 +51,8 @@ TEE_CROSS_COMPILE=aarch64-none-linux-gnu-
 TEE_OUT=${TOP_PATH}/out-bsp/${SOC_FAMILY}/TEE_OBJ
 
 # Board name and flavour shall be listed in associated order (max : two boards)
-DEFAULT_BOARD_NAME_LIST=( "eval" )
-DEFAULT_BOARD_FLAVOUR_LIST=( "ev1" )
+DEFAULT_BOARD_NAME_LIST=( "eval" "dk" )
+DEFAULT_BOARD_FLAVOUR_LIST=( "ev1" "dk" )
 
 #######################################
 # Variables

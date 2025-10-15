@@ -1,5 +1,5 @@
-#ifndef __local_views3_frq09432_st_android_13_0_0_2024_07_19_out_bsp_stm32mp2_TEE_OBJ_stm32mp257f_ev1_include_generated_conf_h_
-#define __local_views3_frq09432_st_android_13_0_0_2024_07_19_out_bsp_stm32mp2_TEE_OBJ_stm32mp257f_ev1_include_generated_conf_h_
+#ifndef __local_views3_frq09432_st_android_13_0_0_2025_09_22_out_bsp_stm32mp2_TEE_OBJ_stm32mp257f_ev1_include_generated_conf_h_
+#define __local_views3_frq09432_st_android_13_0_0_2025_09_22_out_bsp_stm32mp2_TEE_OBJ_stm32mp257f_ev1_include_generated_conf_h_
 #define CFG_AES_GCM_TABLE_BASED 1
 #define CFG_ARM64_core 1
 #define CFG_ARM64_ldelf 1
@@ -96,6 +96,7 @@
 #define CFG_CRYPTO_XTS 1
 #define CFG_DEBUG_INFO 1
 #define CFG_DEVICE_ENUM_PTA 1
+#define CFG_DISPLAY 1
 #define CFG_DRAM_BASE 0x80000000
 #define CFG_DRAM_SIZE 0x80000000
 #define CFG_DRIVERS_CLK 1
@@ -123,6 +124,7 @@
 /* CFG_EXTERNAL_DT is not set */
 /* CFG_EXTERNAL_DTB_OVERLAY is not set */
 #define CFG_EXT_DTS core/arch/arm/dts/external-dt/optee
+#define CFG_FRAME_BUFFER 1
 #define CFG_FTRACE_BUF_WHEN_FULL shift
 /* CFG_FTRACE_SUPPORT is not set */
 #define CFG_FTRACE_US_MS 10000
@@ -170,7 +172,7 @@
 #define CFG_REGULATOR_FIXED 1
 #define CFG_REMOTEPROC_PTA 1
 #define CFG_REMOTEPROC_TA_HEAP_SIZE (4 * 1024)
-#define CFG_RESERVED_VASPACE_SIZE (1024 * 1024 * 10)
+#define CFG_RESERVED_VASPACE_SIZE (10 * 1024 * 1024 + 0x01000000)
 #define CFG_RPMB_FS 1
 #define CFG_RPMB_FS_CACHE_ENTRIES 0
 /* CFG_RPMB_FS_DEBUG_DATA is not set */
@@ -265,6 +267,7 @@
 #define CFG_STM32_IPCC 1
 #define CFG_STM32_IWDG 1
 #define CFG_STM32_LPTIMER 1
+#define CFG_STM32_LTDC 1
 #define CFG_STM32_OMM 1
 #define CFG_STM32_PANIC_ON_IAC_EVENT 1
 #define CFG_STM32_PANIC_ON_SERC_EVENT 1
@@ -319,6 +322,7 @@
 #define CFG_TEE_MANUFACTURER LINARO
 #define CFG_TEE_TA_LOG_LEVEL 0
 /* CFG_TEE_TA_MALLOC_DEBUG is not set */
+#define CFG_TUI_FRAME_BUFFER_SIZE_MAX 0x01000000
 #define CFG_TZDRAM_SIZE 0x02000000
 #define CFG_TZDRAM_START (0x80000000 + 0x02000000)
 /* CFG_ULIBS_MCOUNT is not set */
@@ -337,7 +341,7 @@
 #define CFG_WITH_STATS 1
 /* CFG_WITH_STMM_SP is not set */
 #define CFG_WITH_TRNG 1
-/* CFG_WITH_TUI is not set */
+#define CFG_WITH_TUI 1
 #define CFG_WITH_USER_TA 1
 #define CFG_WITH_VFP 1
 #define CFG_ZLIB 1
